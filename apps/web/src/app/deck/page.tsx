@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { Suspense } from 'react';
 import { DeckView } from '@/components/DeckView';
 
@@ -13,7 +13,7 @@ import { DeckView } from '@/components/DeckView';
 const SuspenseBoundary = Suspense as unknown as (props: {
   fallback?: ReactNode;
   children?: ReactNode;
-}) => JSX.Element;
+}) => ReactElement;
 
 export default function DeckPage() {
   return (
