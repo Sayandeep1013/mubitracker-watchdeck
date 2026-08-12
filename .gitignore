@@ -36,3 +36,6 @@ pnpm-debug.log*
 
 # Agent/session tooling state
 .sisyphus
+
+# Stray root-level QA/screenshot artifacts (Maestro etc.)
+/*.png
