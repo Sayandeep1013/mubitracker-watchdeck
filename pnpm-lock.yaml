@@ -75,6 +75,9 @@ importers:
       '@babel/core':
         specifier: ^7.25.0
         version: 7.29.7
+      '@types/node':
+        specifier: ^20
+        version: 20.19.43
       '@types/react':
         specifier: ~18.3.12
         version: 18.3.31
