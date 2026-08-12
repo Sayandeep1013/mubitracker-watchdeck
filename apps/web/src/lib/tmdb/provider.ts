@@ -79,7 +79,9 @@ function normalizeTmdbItem(item: TmdbResult, format: MediaFormat): NormalizedMed
   const isMovie = format === 'movie';
   const title = (isMovie ? item.title : item.name) ?? 'Unknown';
   const originalTitle = (isMovie ? item.original_title : item.original_name) ?? title;
-  const releaseDate = (isMovie ? item.release_date : item.first_air_date) ?? null;
+  // TMDB returns "" (not null/omitted) for titles with no confirmed release date,
+  // which Postgres rejects for a `date` column — normalize falsy values to null.
+  const releaseDate = (isMovie ? item.release_date : item.first_air_date) || null;
   const year = releaseDate ? parseInt(releaseDate.slice(0, 4), 10) : null;
   const genreIds = item.genre_ids ?? [];
   const lang = item.original_language ?? 'en';

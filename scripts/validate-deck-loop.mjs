@@ -15,7 +15,7 @@ const env = Object.fromEntries(
     }),
 );
 
-const BASE = 'http://localhost:3000';
+const BASE = process.env.BASE_URL || 'http://localhost:3000';
 const SUPABASE_URL = env.NEXT_PUBLIC_SUPABASE_URL;
 const ANON = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const stamp = Date.now().toString().slice(-8);
