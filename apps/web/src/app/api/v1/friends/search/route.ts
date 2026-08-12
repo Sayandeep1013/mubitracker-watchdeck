@@ -17,10 +17,13 @@ export async function GET(request: NextRequest) {
     const supabase = createSupabaseAdminClient();
     const prefix = normalizeUsername(q);
 
+    // Findable by username regardless of profile_visibility — usernames aren't
+    // sensitive, and defaulting new accounts to 'private' made search return
+    // nothing for basically everyone. Visibility still gates profile/collection
+    // *content* separately (canViewCollection / getFriendProfile).
     const { data: profiles, error } = await supabase
       .from('profiles')
       .select('id, username, avatar_url, profile_visibility')
-      .eq('profile_visibility', 'public')
       .ilike('username', `${prefix}%`)
       .neq('id', user.id)
       .limit(limit);
