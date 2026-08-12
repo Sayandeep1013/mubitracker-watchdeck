@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "pnpm turbo run build --filter=@mubitracker/web",
+  "installCommand": "pnpm install",
+  "outputDirectory": ".next"
+}

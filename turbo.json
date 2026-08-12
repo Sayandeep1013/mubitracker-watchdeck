@@ -3,7 +3,15 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"],
+      "env": [
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "TMDB_V3_API_KEY",
+        "TMDB_READ_ACCESS_TOKEN",
+        "NEXT_PUBLIC_APP_URL"
+      ]
     },
     "dev": {
       "cache": false,
