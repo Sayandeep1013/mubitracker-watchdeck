@@ -1,5 +1,5 @@
 /** Internal auth email domain — never shown in UI. Safe for later Google identity linking. */
-export const AUTH_EMAIL_DOMAIN = 'users.watchdeck.local';
+export const AUTH_EMAIL_DOMAIN = 'users.mubitracker.local';
 
 const USERNAME_RE = /^[a-z0-9_]{3,30}$/;
 
@@ -14,7 +14,7 @@ const RESERVED_USERNAMES = new Set([
   'profile',
   'login',
   'signup',
-  'watchdeck',
+  'mubitracker',
   'support',
   'help',
   'null',

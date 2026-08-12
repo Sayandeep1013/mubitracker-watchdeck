@@ -3,7 +3,7 @@ import {
   type MediaFormat,
   type NormalizedMedia,
   TMDB_API_BASE,
-} from '@watchdeck/shared';
+} from '@mubitracker/shared';
 
 interface TmdbResult {
   id: number;

@@ -1,6 +1,6 @@
 # 09 — Social Phase (Phase 3)
 
-Social features enhance discovery without turning Watchdeck into a social network. **No activity feed in v1 social.**
+Social features enhance discovery without turning Mubitracker into a social network. **No activity feed in v1 social.**
 
 ## Core Social Question
 
@@ -21,7 +21,7 @@ status: pending | accepted | blocked
 ## Discovery Methods
 
 1. Search username
-2. Share profile link: `watchdeck.app/u/{username}`
+2. Share profile link: `mubitracker.app/u/{username}`
 
 ## Friend Profile
 

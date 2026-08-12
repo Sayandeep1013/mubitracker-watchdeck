@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { normalizeUsername } from '@watchdeck/shared';
+import { normalizeUsername } from '@mubitracker/shared';
 import { apiError, apiOk, AuthError, requireAuth } from '@/lib/api/helpers';
 import { createSupabaseAdminClient } from '@/lib/supabase/server';
 import { friendshipInvolvingUserFilter } from '@/lib/social/friends';

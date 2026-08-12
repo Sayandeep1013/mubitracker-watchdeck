@@ -99,7 +99,7 @@ List of items with `review_status=pending`. Tap to open review form (Phase 2 for
 
 ## Design Tokens
 
-Shared via `@watchdeck/shared` or CSS variables:
+Shared via `@mubitracker/shared` or CSS variables:
 - Dark theme default (media app convention)
 - High contrast action buttons
 - Focus color distinct from selection

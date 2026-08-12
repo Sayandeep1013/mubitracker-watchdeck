@@ -7,9 +7,9 @@ export default function AboutPage() {
       <Link href="/profile" className="mb-4 inline-block text-sm text-zinc-500">
         ← Back
       </Link>
-      <h1 className="mb-4 text-2xl font-bold">About Watchdeck</h1>
+      <h1 className="mb-4 text-2xl font-bold">About Mubitracker</h1>
       <p className="mb-6 text-sm text-zinc-400">
-        Watchdeck is a frictionless personal media memory system. Track what you&apos;ve watched
+        Mubitracker is a frictionless personal media memory system. Track what you&apos;ve watched
         with one decision per title.
       </p>
 

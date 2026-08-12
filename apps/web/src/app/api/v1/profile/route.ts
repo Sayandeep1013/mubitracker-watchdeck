@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { updateProfileSchema } from '@watchdeck/shared';
+import { updateProfileSchema } from '@mubitracker/shared';
 import { apiError, apiOk, AuthError, requireAuth } from '@/lib/api/helpers';
 import { createSupabaseAdminClient } from '@/lib/supabase/server';
 import type { TablesUpdate } from '@/lib/supabase/database.types';

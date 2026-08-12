@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { FlatList, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import type { MediaSummary } from '@watchdeck/shared';
-import { tmdbPosterUrl } from '@watchdeck/shared';
+import type { MediaSummary } from '@mubitracker/shared';
+import { tmdbPosterUrl } from '@mubitracker/shared';
 import { apiClient } from '@/lib/api';
 
 export default function SearchScreen() {

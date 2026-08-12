@@ -1,6 +1,6 @@
 'use client';
 
-import { tmdbPosterUrl } from '@watchdeck/shared';
+import { tmdbPosterUrl } from '@mubitracker/shared';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useApiClient, useSupabase } from '@/hooks/useApiClient';
-import type { Profile } from '@watchdeck/shared';
+import type { Profile } from '@mubitracker/shared';
 
 export default function ProfilePage() {
   const client = useApiClient();
@@ -23,7 +23,7 @@ export default function ProfilePage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `watchdeck-export-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `mubitracker-export-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
   };
 
@@ -86,7 +86,7 @@ export default function ProfilePage() {
           <textarea
             value={importJson}
             onChange={(e) => setImportJson(e.target.value)}
-            placeholder="Paste watchdeck.json content..."
+            placeholder="Paste mubitracker.json content..."
             rows={4}
             className="mb-2 w-full rounded border border-neutral-800 bg-neutral-950 p-2 text-xs text-white placeholder-neutral-700"
           />

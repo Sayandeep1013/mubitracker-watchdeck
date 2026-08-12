@@ -21,7 +21,7 @@ Status: **in progress** (2026-08-12)
 
 ## Filter → TMDB mapping
 
-| Watchdeck filter | TMDB discover params | Local post-filter |
+| Mubitracker filter | TMDB discover params | Local post-filter |
 |---|---|---|
 | `classification=anime` | `with_genres=16` (+ AND user genres), default `with_original_language=ja` if language unset | Keep `classification === 'anime'` |
 | `classification=documentary` | `with_genres=99` (AND user genres) | Keep documentary |

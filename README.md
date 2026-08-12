@@ -1,4 +1,4 @@
-# Watchdeck
+# Mubitracker
 
 A frictionless personal media memory system. Track movies, TV, and anime with one decision per title.
 

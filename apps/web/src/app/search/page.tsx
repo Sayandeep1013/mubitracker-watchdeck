@@ -1,7 +1,7 @@
 'use client';
 
-import type { MediaSummary } from '@watchdeck/shared';
-import { FILTER_TYPE_OPTIONS, tmdbPosterUrl } from '@watchdeck/shared';
+import type { MediaSummary } from '@mubitracker/shared';
+import { FILTER_TYPE_OPTIONS, tmdbPosterUrl } from '@mubitracker/shared';
 import Image from 'next/image';
 import { useMemo, useState } from 'react';
 import { useApiClient } from '@/hooks/useApiClient';

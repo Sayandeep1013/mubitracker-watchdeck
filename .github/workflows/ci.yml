@@ -23,15 +23,15 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm --filter @watchdeck/shared build
+      - run: pnpm --filter @mubitracker/shared build
 
       - run: pnpm typecheck
 
-      - run: pnpm --filter @watchdeck/shared test
+      - run: pnpm --filter @mubitracker/shared test
 
-      - run: pnpm --filter @watchdeck/web lint
+      - run: pnpm --filter @mubitracker/web lint
 
-      - run: pnpm --filter @watchdeck/web build
+      - run: pnpm --filter @mubitracker/web build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder

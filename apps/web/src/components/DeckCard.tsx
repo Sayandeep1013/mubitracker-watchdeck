@@ -1,7 +1,7 @@
 'use client';
 
-import type { DeckItem } from '@watchdeck/shared';
-import { tmdbPosterUrl } from '@watchdeck/shared';
+import type { DeckItem } from '@mubitracker/shared';
+import { tmdbPosterUrl } from '@mubitracker/shared';
 import Image from 'next/image';
 import { IconBookmarkPlus, IconCheck, IconClock, IconX } from './icons';
 

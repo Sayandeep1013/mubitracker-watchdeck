@@ -7,8 +7,8 @@ import {
   type Classification,
   type DeckFilters,
   type MediaFormat,
-} from '@watchdeck/shared';
-import type { WatchdeckClient } from '@watchdeck/shared';
+} from '@mubitracker/shared';
+import type { MubitrackerClient } from '@mubitracker/shared';
 import { IconSliders, IconX } from './icons';
 import { useEffect, useState } from 'react';
 
@@ -16,7 +16,7 @@ interface FilterDrawerProps {
   filters: DeckFilters;
   onApply: (filters: DeckFilters) => void;
   onClose: () => void;
-  client: WatchdeckClient;
+  client: MubitrackerClient;
 }
 
 const GENRE_NAMES = Object.keys(GENRE_MAP);

@@ -13,7 +13,7 @@ import {
   type MediaFormat,
   type ReviewStatus,
   type WatchStatus,
-} from '@watchdeck/shared';
+} from '@mubitracker/shared';
 import { tmdbDiscover } from '@/lib/tmdb/provider';
 import { upsertMediaBatch } from '@/lib/media/repository';
 
@@ -58,7 +58,7 @@ function hasClassification(filters: ParsedDeckFilters, value: Classification): b
   return Boolean(filters.classification?.includes(value));
 }
 
-/** Map Watchdeck filters → TMDB discover query (format-aware for dates/genres). */
+/** Map Mubitracker filters → TMDB discover query (format-aware for dates/genres). */
 export function buildTmdbParams(
   filters: ParsedDeckFilters,
   format: MediaFormat,

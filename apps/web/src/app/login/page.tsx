@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { usernameToAuthEmail } from '@watchdeck/shared';
+import { usernameToAuthEmail } from '@mubitracker/shared';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 export default function LoginPage() {

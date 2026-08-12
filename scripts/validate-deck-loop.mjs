@@ -20,11 +20,11 @@ const SUPABASE_URL = env.NEXT_PUBLIC_SUPABASE_URL;
 const ANON = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const stamp = Date.now().toString().slice(-8);
 const username = process.env.TEST_USERNAME || `deck_${stamp}`;
-const password = process.env.TEST_PASSWORD || 'WatchdeckTest123!';
+const password = process.env.TEST_PASSWORD || 'MubitrackerTest123!';
 const reuseExisting = Boolean(process.env.TEST_USERNAME);
 
 function usernameToAuthEmail(u) {
-  return `${u.toLowerCase()}@users.watchdeck.local`;
+  return `${u.toLowerCase()}@users.mubitracker.local`;
 }
 
 const results = [];

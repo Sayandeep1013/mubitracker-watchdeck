@@ -20,15 +20,15 @@ importers:
 
   apps/mobile:
     dependencies:
+      '@mubitracker/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@react-native-async-storage/async-storage':
         specifier: ^2.1.0
         version: 2.2.0(react-native@0.76.5(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@types/react@18.3.31)(react@18.3.1))
       '@supabase/supabase-js':
         specifier: ^2.47.10
         version: 2.112.3
-      '@watchdeck/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       expo:
         specifier: ~52.0.0
         version: 52.0.49(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@expo/metro-runtime@4.0.1(react-native@0.76.5(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@types/react@18.3.31)(react@18.3.1)))(react-native@0.76.5(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@types/react@18.3.31)(react@18.3.1))(react@18.3.1)
@@ -75,6 +75,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@mubitracker/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@supabase/ssr':
         specifier: ^0.5.2
         version: 0.5.2(@supabase/supabase-js@2.112.3)
@@ -84,9 +87,6 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.62.8
         version: 5.101.4(react@19.1.0)
-      '@watchdeck/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       next:
         specifier: 15.5.23
         version: 15.5.23(react-dom@19.1.0(react@19.1.0))(react@19.1.0)

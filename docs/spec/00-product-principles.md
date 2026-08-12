@@ -2,7 +2,7 @@
 
 ## Identity
 
-Watchdeck is a **frictionless personal media memory system**. It is not an IMDb clone, Letterboxd clone, MyAnimeList clone, social network, or recommendation engine.
+Mubitracker is a **frictionless personal media memory system**. It is not an IMDb clone, Letterboxd clone, MyAnimeList clone, social network, or recommendation engine.
 
 ## Core Loop
 

@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { importSchema } from '@watchdeck/shared';
+import { importSchema } from '@mubitracker/shared';
 import { apiError, apiOk, AuthError, requireAuth } from '@/lib/api/helpers';
 import { upsertMedia, upsertUserMedia } from '@/lib/media/repository';
 import { tmdbGetDetails } from '@/lib/tmdb/provider';

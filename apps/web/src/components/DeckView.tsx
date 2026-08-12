@@ -8,7 +8,7 @@ import {
   type DeckItem,
   type UndoAction,
   MAX_UNDO_STACK,
-} from '@watchdeck/shared';
+} from '@mubitracker/shared';
 import { IconSliders } from './icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';

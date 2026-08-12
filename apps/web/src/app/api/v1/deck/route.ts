@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { DECK_BATCH_SIZE } from '@watchdeck/shared';
+import { DECK_BATCH_SIZE } from '@mubitracker/shared';
 import { apiError, apiOk, AuthError, requireAuth } from '@/lib/api/helpers';
 import { generateDeck, parseDeckFilters } from '@/lib/deck/generate';
 import { createSupabaseAdminClient } from '@/lib/supabase/server';

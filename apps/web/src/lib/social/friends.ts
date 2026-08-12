@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { CollectionComparison, MediaSummary, Profile } from '@watchdeck/shared';
+import type { CollectionComparison, MediaSummary, Profile } from '@mubitracker/shared';
 import { asDbMedia, toMediaSummary } from '@/lib/media/repository';
 
 /** PostgREST `.or()` filter matching an accepted/blocked/etc. friendship between these two specific users, in either direction. */

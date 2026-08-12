@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { recommendationSchema } from '@watchdeck/shared';
+import { recommendationSchema } from '@mubitracker/shared';
 import { apiError, apiOk, AuthError, requireAuth } from '@/lib/api/helpers';
 import { createSupabaseAdminClient } from '@/lib/supabase/server';
 import { friendshipPairFilter } from '@/lib/social/friends';

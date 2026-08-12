@@ -12,8 +12,8 @@ const env = Object.fromEntries(
 );
 
 const BASE = 'http://localhost:3000';
-const email = 'deck_99149876@users.watchdeck.local';
-const password = 'WatchdeckTest123!';
+const email = 'deck_99149876@users.mubitracker.local';
+const password = 'MubitrackerTest123!';
 
 const signIn = await fetch(`${env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/token?grant_type=password`, {
   method: 'POST',

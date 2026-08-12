@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { OfflineAction } from '@watchdeck/shared';
+import type { OfflineAction } from '@mubitracker/shared';
 import { apiClient } from './api';
 
-const QUEUE_KEY = 'watchdeck_offline_queue';
+const QUEUE_KEY = 'mubitracker_offline_queue';
 
 export async function getOfflineQueue(): Promise<OfflineAction[]> {
   const raw = await AsyncStorage.getItem(QUEUE_KEY);

@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { createReviewSchema } from '@watchdeck/shared';
+import { createReviewSchema } from '@mubitracker/shared';
 import { apiError, apiOk, AuthError, requireAuth } from '@/lib/api/helpers';
 import { createSupabaseAdminClient } from '@/lib/supabase/server';
 

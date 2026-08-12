@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { Classification, MediaFormat } from '@watchdeck/shared';
+import { Classification, MediaFormat } from '@mubitracker/shared';
 import { apiError, apiOk, AuthError, requireAuth } from '@/lib/api/helpers';
 import { asDbMedia, toMediaSummary } from '@/lib/media/repository';
 import { createSupabaseAdminClient } from '@/lib/supabase/server';

@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Watchdeck',
+  title: 'Mubitracker',
   description: 'A frictionless personal media memory system',
 };
 

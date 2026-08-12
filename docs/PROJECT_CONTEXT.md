@@ -1,4 +1,4 @@
-# Watchdeck (MubiTracker) — Project Context Guide
+# Mubitracker (MubiTracker) — Project Context Guide
 
 ## Handoff for Next Chat
 
@@ -11,10 +11,10 @@ Start a new chat and attach **both** files:
 
 ## What This Is
 
-**Watchdeck** is a frictionless personal media-tracking app. Core loop: **one title → one decision (watched / haven't watched / review later) → next title**. Not a Letterboxd clone — speed is the product.
+**Mubitracker** is a frictionless personal media-tracking app. Core loop: **one title → one decision (watched / haven't watched / review later) → next title**. Not a Letterboxd clone — speed is the product.
 
 - **Repo folder:** `D:\Projects\MubiTracker` (name differs from product name; that's intentional)
-- **Product name:** Watchdeck
+- **Product name:** Mubitracker
 - **Intent:** Personal/hobby, non-commercial, solo part-time build
 - **Stack:** Next.js 15 + Supabase + TMDB + Expo mobile (scaffolded)
 
@@ -81,7 +81,7 @@ Files created (gitignored):
 ## Auth
 
 - **MVP:** username + password only (unique, case-insensitive)
-- Under the hood: Supabase Auth with synthetic email `{username}@users.watchdeck.local`
+- Under the hood: Supabase Auth with synthetic email `{username}@users.mubitracker.local`
 - Signup via `POST /api/v1/auth/signup` (service role, auto-confirmed) then client password sign-in
 - **Later:** link Google/other OAuth identities for recovery/login without remembering username
 - Never commit or expose the synthetic email in UI
@@ -194,16 +194,16 @@ Mobile: set `EXPO_PUBLIC_API_URL=https://your-app.vercel.app` for production bui
 ```bash
 pnpm install
 pnpm dev                          # starts web on :3000
-pnpm --filter @watchdeck/shared test
-pnpm --filter @watchdeck/web build
+pnpm --filter @mubitracker/shared test
+pnpm --filter @mubitracker/web build
 TMDB_V3_API_KEY=xxx node scripts/tmdb-smoke-test.mjs
-pnpm --filter @watchdeck/mobile dev  # Expo
+pnpm --filter @mubitracker/mobile dev  # Expo
 ```
 
 ## Conventions
 
 - Package manager: **pnpm** (workspace)
 - TypeScript strict mode
-- `@watchdeck/shared` for all types/schemas between web + mobile
+- `@mubitracker/shared` for all types/schemas between web + mobile
 - Server uses **service role** client; browser uses **anon** client
 - Do not commit `.env.local`, `.env`, or API keys

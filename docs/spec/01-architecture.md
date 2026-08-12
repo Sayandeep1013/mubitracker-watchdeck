@@ -16,7 +16,7 @@ API routes are structured for later extraction to `apps/api` without contract ch
 ## Monorepo Layout
 
 ```text
-watchdeck/
+mubitracker/
   apps/
     web/              # Next.js — deck, search, collection, API routes
     mobile/           # Expo (Phase 2)
@@ -30,7 +30,7 @@ watchdeck/
 ## System Diagram
 
 ```text
-                    WATCHDECK
+                    MUBITRACKER
                         │
         ┌───────────────┴───────────────┐
         │                               │
@@ -38,7 +38,7 @@ watchdeck/
         │                               │
         └───────────────┬───────────────┘
                         │
-                  WATCHDECK API
+                  MUBITRACKER API
                   (Next.js routes)
                         │
         ┌───────────────┼───────────────┐
@@ -49,9 +49,9 @@ watchdeck/
 
 ## Architectural Rules
 
-1. **Frontend never calls TMDB directly** — all media data flows through Watchdeck API.
+1. **Frontend never calls TMDB directly** — all media data flows through Mubitracker API.
 2. **TMDB/Jikan are data providers**, not the application database.
-3. Watchdeck owns: user ↔ media relationships, reviews, friendships.
+3. Mubitracker owns: user ↔ media relationships, reviews, friendships.
 4. Providers supply: metadata, search, discovery candidates.
 
 ## MediaProvider Interface

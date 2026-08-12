@@ -22,13 +22,13 @@ import { filterPresetSchema, updateProfileSchema } from './schemas/index.js';
 type FilterPresetInput = z.infer<typeof filterPresetSchema>;
 type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 
-export interface WatchdeckClientOptions {
+export interface MubitrackerClientOptions {
   baseUrl: string;
   getAccessToken: () => Promise<string | null>;
 }
 
-export class WatchdeckClient {
-  constructor(private options: WatchdeckClientOptions) {}
+export class MubitrackerClient {
+  constructor(private options: MubitrackerClientOptions) {}
 
   private async fetch<T>(path: string, init?: RequestInit): Promise<T> {
     const token = await this.options.getAccessToken();

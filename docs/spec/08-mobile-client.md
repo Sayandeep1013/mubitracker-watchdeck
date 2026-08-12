@@ -5,13 +5,13 @@
 - **Expo** (SDK 52+)
 - **React Native Gesture Handler** + **Reanimated** for swipe
 - **Expo Router** for navigation
-- **@watchdeck/shared** for types, schemas, API client
+- **@mubitracker/shared** for types, schemas, API client
 
 Not a WebView wrapper — native gesture handling required.
 
 ## Shared Code
 
-From `@watchdeck/shared`:
+From `@mubitracker/shared`:
 - TypeScript types and enums
 - Zod validation schemas
 - API client (fetch wrapper with auth header injection)
@@ -75,7 +75,7 @@ Supabase Auth with `@supabase/supabase-js` + secure storage for session (Expo Se
 
 ## Import (Phase 2)
 
-- File picker for `watchdeck.json`
+- File picker for `mubitracker.json`
 - Validate schema v1
 - Upsert user_media + reviews via `/api/v1/import`
 

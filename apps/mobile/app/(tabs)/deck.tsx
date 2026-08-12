@@ -8,8 +8,8 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import type { DeckItem } from '@watchdeck/shared';
-import { tmdbPosterUrl } from '@watchdeck/shared';
+import type { DeckItem } from '@mubitracker/shared';
+import { tmdbPosterUrl } from '@mubitracker/shared';
 import { apiClient } from '@/lib/api';
 import { enqueueOfflineAction, syncOfflineQueue } from '@/lib/offline-queue';
 

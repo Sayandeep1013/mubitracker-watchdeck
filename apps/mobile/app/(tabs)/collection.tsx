@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { FlatList, Image, StyleSheet, Text, View } from 'react-native';
-import { tmdbPosterUrl } from '@watchdeck/shared';
+import { tmdbPosterUrl } from '@mubitracker/shared';
 import { apiClient } from '@/lib/api';
 
 export default function CollectionScreen() {

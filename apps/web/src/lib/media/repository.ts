@@ -5,7 +5,7 @@ import {
   type NormalizedMedia,
   type ReviewStatus,
   type WatchStatus,
-} from '@watchdeck/shared';
+} from '@mubitracker/shared';
 
 export interface DbMedia {
   id: string;

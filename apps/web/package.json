@@ -1,5 +1,5 @@
 {
-  "name": "@watchdeck/web",
+  "name": "@mubitracker/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -13,7 +13,7 @@
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.10",
     "@tanstack/react-query": "^5.62.8",
-    "@watchdeck/shared": "workspace:*",
+    "@mubitracker/shared": "workspace:*",
     "next": "15.5.23",
     "react": "19.1.0",
     "react-dom": "19.1.0",

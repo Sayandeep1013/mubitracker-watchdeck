@@ -3,7 +3,7 @@ import {
   authCredentialsSchema,
   isValidUsername,
   usernameToAuthEmail,
-} from '@watchdeck/shared';
+} from '@mubitracker/shared';
 import { apiError, apiOk } from '@/lib/api/helpers';
 import { createSupabaseAdminClient } from '@/lib/supabase/server';
 

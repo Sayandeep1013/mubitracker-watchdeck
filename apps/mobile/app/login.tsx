@@ -1,4 +1,4 @@
-import { usernameToAuthEmail } from '@watchdeck/shared';
+import { usernameToAuthEmail } from '@mubitracker/shared';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -49,7 +49,7 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.logo}>Watchdeck</Text>
+      <Text style={styles.logo}>Mubitracker</Text>
       <TextInput
         value={username}
         onChangeText={setUsername}

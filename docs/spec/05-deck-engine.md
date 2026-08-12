@@ -1,6 +1,6 @@
 # 05 — Deck Engine
 
-The deck is the heart of Watchdeck. This document defines server-side generation, batching, and client prefetch behavior.
+The deck is the heart of Mubitracker. This document defines server-side generation, batching, and client prefetch behavior.
 
 ## UX Contract
 
@@ -36,7 +36,7 @@ Alternate media types per request: alternate between movie discover and TV disco
 ## Filtered Deck (Phase 1.5)
 
 ```text
-1. Parse Watchdeck filter DSL → TMDB discover params + local filters
+1. Parse Mubitracker filter DSL → TMDB discover params + local filters
 2. TMDB params: with_genres, with_original_language, date ranges, format
 3. Local filters: status, review_status, friend overlap (Phase 3)
 4. Fetch TMDB candidates, upsert, anti-join locally

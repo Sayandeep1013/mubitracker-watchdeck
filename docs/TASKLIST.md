@@ -1,4 +1,4 @@
-# Watchdeck — Task List
+# Mubitracker — Task List
 
 > Status as of **2026-08-12**. Update this file as tasks complete.
 > See [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) for full project background.
@@ -8,7 +8,7 @@
 ## Phase 0: Infrastructure — MOSTLY DONE
 
 - [x] Monorepo scaffold (pnpm + turbo)
-- [x] Shared package (`@watchdeck/shared`)
+- [x] Shared package (`@mubitracker/shared`)
 - [x] 11 subspec documents
 - [x] Supabase project created (Mubitracker, `deslckxkuvbfugdxibdn`)
 - [x] Initial schema migration applied remotely
