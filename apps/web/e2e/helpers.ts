@@ -49,31 +49,45 @@ export async function apiContext(token: string): Promise<APIRequestContext> {
   });
 }
 
+/** Broad queries that reliably return many distinct titles. */
+const SEED_QUERIES = ['star', 'love', 'man', 'war', 'night', 'day', 'life', 'dark'];
+
 /**
  * Classify `count` titles so pagination/collection assertions have data.
  * Returns the media ids that were classified.
+ *
+ * Seeds via /search rather than /deck deliberately: the deck applies
+ * randomised TMDB paging plus exclusion rules and can transiently fail or
+ * under-fill (the exact failures Stage 2 of the plan exists to fix), which made
+ * seeding flaky. Search is deterministic for a given query.
  */
 export async function seedCollection(token: string, count: number): Promise<string[]> {
   const api = await apiContext(token);
-  const ids: string[] = [];
+  const ids = new Set<string>();
 
-  while (ids.length < count) {
-    const res = await api.get(`/api/v1/deck?limit=${Math.min(20, count - ids.length + 5)}`);
-    expect(res.ok(), 'deck fetch while seeding').toBeTruthy();
-    const { items } = await res.json();
-    if (!items?.length) break;
+  for (const q of SEED_QUERIES) {
+    if (ids.size >= count) break;
 
-    for (const item of items) {
-      if (ids.length >= count) break;
+    const res = await api.get(`/api/v1/search?q=${q}&limit=50`);
+    if (!res.ok()) continue; // tolerate a flaky query rather than failing the run
+    const { results } = await res.json();
+
+    for (const item of results ?? []) {
+      if (ids.size >= count) break;
+      if (ids.has(item.id)) continue;
       const put = await api.put(`/api/v1/user-media/${item.id}`, {
-        data: { status: ids.length % 2 === 0 ? 'watched' : 'unwatched' },
+        data: { status: ids.size % 2 === 0 ? 'watched' : 'unwatched' },
       });
-      if (put.ok()) ids.push(item.id);
+      if (put.ok()) ids.add(item.id);
     }
   }
 
   await api.dispose();
-  return ids;
+  expect(
+    ids.size,
+    `seeded ${ids.size} of ${count} titles — all seed queries exhausted`,
+  ).toBeGreaterThanOrEqual(count);
+  return [...ids];
 }
 
 /** Sign in through the real UI so the browser context carries a valid session. */

@@ -10,19 +10,37 @@ Read after [`CONTEXT.md`](CONTEXT.md). Then work [`IMPLEMENTATION-PLAN.md`](IMPL
 ```
 Read docs/CONTEXT.md, docs/HANDOFF.md, and docs/IMPLEMENTATION-PLAN.md.
 
-Continue the plan from Stage 0. Work top-down, one item at a time.
-For each item: implement → typecheck → verify against its acceptance
-criterion → commit → tick the checkbox in IMPLEMENTATION-PLAN.md →
-append a line to the Session Log in HANDOFF.md.
+Stage 0 is shipped. Continue with Stage 1 (deck engine prerequisites),
+then Stage 2. Work top-down, one item at a time.
 
-Stop and ask me only if an item needs a product decision I haven't
-already made in docs/spec/. Otherwise keep going.
+For each item: implement → pnpm typecheck → write/extend its test →
+verify against the acceptance criterion → commit → update the checkbox
+in IMPLEMENTATION-PLAN.md → append to the Session Log in HANDOFF.md.
 
-When you finish a stage, update the "Next session" prompt block at the
-top of HANDOFF.md and tell me what changed.
+If my Android device is connected (check: adb devices), first clear the
+Stage 0 mobile items still marked [~] by running:
+  maestro test mobile-qa/flows/
+and promote them to [x] only if they pass.
+
+Stop and ask me only if an item needs a product decision that isn't
+already settled in docs/spec/. Otherwise keep going.
+
+When you finish a stage, update this prompt block and tell me what
+changed.
 ```
 
-**Current position: Stage 0 not started.** Stages 1–5 are blocked behind it only by convention (Stage 0 items are independent) — but Stage 0 is where the user-visible damage is.
+**Current position: Stage 0 shipped (`539641a`). Stage 1 is next.**
+
+### Pending verification
+
+Code-complete but unverified — all four need the Android device. Maestro flows are already written; run `maestro test mobile-qa/flows/`.
+
+| Item | Flow |
+|---|---|
+| 0.1 auth-guard blank screen | `mobile-qa/flows/auth-guard-offline.yaml` |
+| 0.2 tabs never refresh | `mobile-qa/flows/tab-refresh.yaml` |
+| 0.5 undo desync after review-later | `mobile-qa/flows/undo-after-review-later.yaml` |
+| 0.7 mobile error handling | covered incidentally by the above; no dedicated flow yet |
 
 ---
 
@@ -52,6 +70,28 @@ This is the mechanism that lets a session run without the user in the loop. Foll
 ## Session Log
 
 Newest first. One line per completed item; a block per stage.
+
+### Stage 0 complete — 2026-08-12 (`539641a`)
+
+Seven defects fixed. **Verified:** 0.3 (collection pagination), 0.4 (review save), 0.6 (CI env var).
+**Shipped but unverified** (`[~]`, needs device): 0.1, 0.2, 0.5, 0.7 — see *Pending verification* above.
+
+| Item | Change |
+|---|---|
+| 0.1 | `.catch()` on the auth-guard `getUser()` + loading spinner. Without it a network rejection left `checked` false forever behind `{checked && <Stack>}` — a permanent blank launch screen. *(self-introduced)* |
+| 0.2 / 0.7 | New `lib/useFocusFetch.ts` + `components/ScreenState.tsx`: fetch-on-focus with loading/error/retry, applied to collection, review-later, profile. Tab screens stay mounted, so the old `useEffect(…, [])` ran once per session and every tab showed stale data. |
+| 0.5 | Record `lastAction` for review-later too — it was skipped while the index still advanced, so undo restored the wrong title. *(self-introduced)* |
+| 0.7 | `search.tsx` now awaits classify calls and shows saved/failed/retry; adds poster placeholders, year/type, a11y labels, 44–48dp targets. Profile gained watched/reviews/friends stats. |
+| 0.3 | Collection captures `total`/`pageSize` and renders a pager (77 of 101 items were unreachable), plus an error+retry state and capitalised chips. |
+| 0.4 | Review editor: `catch` + visible error, non-uuid guard, preserves typed text on failure. |
+| 0.6 | CI set `TMDB_API_KEY`, referenced nowhere; replaced with `TMDB_V3_API_KEY` / `TMDB_READ_ACCESS_TOKEN` + `NEXT_PUBLIC_APP_URL`. |
+
+**Tests added.** `apps/web/e2e/` (Playwright + config, wired into `apps/web/package.json` as `test:e2e`) and `mobile-qa/` (Maestro flows, subflows, README) per spec 50 §4.
+Web E2E: **4/4 green across 3 consecutive runs** against production. CI green on the commit.
+
+**Two things worth remembering:**
+- The first pagination test failure was a **bug in the test**, not the app — it read the DOM immediately after clicking Next while the grid was still swapped for "Loading…". The API was correct all along (page 1 = 24, page 2 = 2, total = 26, verified directly). Always wait for content to settle before asserting.
+- Seeding originally went through `/api/v1/deck` and was flaky, because the deck endpoint randomises TMDB paging and can transiently fail — the very problems Stage 2 exists to fix. Seeding now uses `/api/v1/search`, which is deterministic.
 
 ### 2026-08-12 — Audit, design, and spec build-out
 

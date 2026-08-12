@@ -54,14 +54,24 @@ Username + password only. Under the hood, Supabase Auth with a **synthetic email
 
 **Measured performance** (after the `bom1` region move): card→card advance **275ms** web / instant mobile; most pages <1s. Mobile is **not** slow. The remaining hot spots are **filtered deck loads (~9s)** and **title search (~6.2s)**.
 
-**Known broken** — full list with evidence in [`AUDIT-2026-08-12.md`](AUDIT-2026-08-12.md). The headline items:
+**Known broken** — full list with evidence in [`AUDIT-2026-08-12.md`](AUDIT-2026-08-12.md). Status as of Stage 0 (`539641a`):
 
+*Still broken — Stages 1–5:*
 - The deck engine can only reach **~400 titles**; a heavy account (283 tracked) has effectively exhausted it.
 - Swiping left (**"haven't watched"**) has **no effect** — those titles are never excluded.
 - One under-filled batch **permanently kills** the deck (null cursor → clients stop prefetching).
-- Mobile Collection/Review Later/Profile **never refresh** after first mount.
-- Web Collection pagination is **unreachable** — 77 of 101 items invisible.
+- Series genre coverage is **46%** (movies 99%) — TMDB TV genre IDs are missing from `genres`.
 - Mobile has **no friends UI at all**, no filters, no Watch Later, gesture-only actions, zero accessibility labels.
+- Adult / R-18 titles can reach a default deck.
+
+*Fixed in Stage 0:*
+- ~~Web Collection pagination unreachable~~ — pager shipped, E2E verified.
+- ~~Review save failing silently~~ — error handling + uuid guard, E2E verified.
+- ~~Mobile tabs never refreshing~~ — `useFocusFetch`; **awaiting device verification**.
+- ~~Auth-guard blank screen on launch~~ — `.catch()` + spinner; **awaiting device verification**.
+- ~~Undo desync after review-later~~ — **awaiting device verification**.
+
+Anything marked *awaiting device verification* is `[~]` in the plan and listed in [`HANDOFF.md`](HANDOFF.md).
 
 ## 6. Reference data (live DB, 2026-08-12)
 
@@ -80,8 +90,8 @@ Useful for reasoning about the engine without re-querying:
 |---|---|
 | Supabase MCP | project `deslckxkuvbfugdxibdn` — SQL, migrations, advisors, type gen |
 | Vercel MCP | deployments, build logs, project config |
-| Playwright 1.62.1 | web E2E; scripts belong in the scratchpad, not the repo |
-| Maestro 2.6.1 + MCP | Android device automation; **a no-op run costs ~24s** |
+| Playwright 1.62.1 | web E2E — suite lives in `apps/web/e2e/`, run with `pnpm --filter @mubitracker/web test:e2e`. Needs `E2E_SUPABASE_URL` + `E2E_SUPABASE_ANON_KEY` to seed (the API authenticates by bearer header, not cookie). Targets production unless `E2E_BASE_URL` is set. |
+| Maestro 2.6.1 + MCP | Android device automation; flows in `mobile-qa/flows/`, see `mobile-qa/README.md`. **A no-op run costs ~24s**, so device E2E belongs in a nightly job. |
 | adb | device id `00158351M001200` when connected (**not always plugged in**) |
 | Expo dev server | `pnpm --filter @mubitracker/mobile dev`; LAN mode works, **tunnel does not** (`exp.direct` unreachable from this network) |
 

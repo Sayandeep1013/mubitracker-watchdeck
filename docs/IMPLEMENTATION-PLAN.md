@@ -14,37 +14,51 @@ Every item names its spec, its files, and how to verify it. If an item can't be 
 
 **Definition of done for any item:** code changed · `pnpm typecheck` clean · relevant test passes · verified against the acceptance criterion · committed and pushed · this file's checkbox ticked · [`HANDOFF.md`](HANDOFF.md) updated.
 
+**Status legend**
+
+| Mark | Meaning |
+|---|---|
+| `[ ]` | Not started |
+| `[~]` | Code complete and shipped, but the acceptance criterion is **not yet verified** — usually because it needs the physical Android device |
+| `[x]` | Verified against its acceptance criterion |
+
+Never promote `[~]` to `[x]` without actually running the check. Anything left at `[~]` is listed in [`HANDOFF.md`](HANDOFF.md) under *Pending verification*.
+
 ---
 
 ## Stage 0 — Stop the bleeding
 
 Independent, small, immediately felt. No prerequisites. **Do these first.**
 
-- [ ] **0.1 Auth-guard blank screen (P0)** — `apps/mobile/app/_layout.tsx:19`
+> **Shipped 2026-08-12 in `539641a`.** Web and CI items are verified; the four
+> mobile items are code-complete but need the Android device to confirm.
+> Maestro flows are already written for them in `mobile-qa/flows/`.
+
+- [~] **0.1 Auth-guard blank screen (P0)** — `apps/mobile/app/_layout.tsx:19`
   `supabase.auth.getUser().then()` has no `.catch()`. On network rejection `setChecked(true)` never runs and `{checked && <Stack>}` renders nothing → **permanent blank screen**. Add `.catch()`, plus a loading indicator during the round-trip.
   *Verify:* airplane-mode launch reaches the login screen, never a blank one.
 
-- [ ] **0.2 Mobile screens never refresh (P0)** — `apps/mobile/app/(tabs)/collection.tsx:9`, `review-later.tsx:10`, `profile.tsx:11`
+- [~] **0.2 Mobile screens never refresh (P0)** — `apps/mobile/app/(tabs)/collection.tsx:9`, `review-later.tsx:10`, `profile.tsx:11`
   `useEffect(…, [])` with no `useFocusEffect`; tabs stay mounted so data is stale all session. Swipe a title watched → Collection still shows "Unwatched".
   *Verify:* classify on Deck, switch to Collection, status is correct without an app restart.
 
-- [ ] **0.3 Web collection pagination (P0)** — `apps/web/src/app/collection/page.tsx`
+- [x] **0.3 Web collection pagination (P0)** — `apps/web/src/app/collection/page.tsx`
   77 of 101 items unreachable: `page` state exists, nothing sets it >1, `total` discarded. Add the pager. Spec [`32`](spec/32-web-ux.md).
   *Verify:* an account with >24 items can reach every item.
 
-- [ ] **0.4 Review save fails silently (P0)** — `apps/web/src/app/review-later/[id]/page.tsx`
+- [x] **0.4 Review save fails silently (P0)** — `apps/web/src/app/review-later/[id]/page.tsx`
   `save()` is `try/finally` with no `catch`; a 400 (`invalid uuid` on `media_id`) leaves the UI unchanged. Add error handling **and** fix the id being passed.
   *Verify:* a failing save surfaces an error; a valid save persists.
 
-- [ ] **0.5 Undo desync after swipe-up** — `apps/mobile/app/(tabs)/deck.tsx:83`
+- [~] **0.5 Undo desync after swipe-up** — `apps/mobile/app/(tabs)/deck.tsx:83`
   `lastAction` is skipped for review-later but the index still advances, so undo restores the wrong title. *(Self-introduced.)*
   *Verify:* swipe up, then undo — the correct title is restored.
 
-- [ ] **0.6 CI references a dead env var** — `.github/workflows/ci.yml`
+- [x] **0.6 CI references a dead env var** — `.github/workflows/ci.yml`
   Sets `TMDB_API_KEY`, which no longer exists anywhere; code uses `TMDB_V3_API_KEY` / `TMDB_READ_ACCESS_TOKEN`. Spec [`50`](spec/50-pipeline.md).
   *Verify:* CI green with correct vars declared in `turbo.json` build `env`.
 
-- [ ] **0.7 Mobile error handling** — `collection.tsx:10`, `review-later.tsx:11` have no `.catch()` → permanent blank screen on failure. `search.tsx:43-48` is fire-and-forget with no feedback.
+- [~] **0.7 Mobile error handling** — `collection.tsx:10`, `review-later.tsx:11` have no `.catch()` → permanent blank screen on failure. `search.tsx:43-48` is fire-and-forget with no feedback.
   *Verify:* with the API unreachable, every screen shows an error state with retry.
 
 ---

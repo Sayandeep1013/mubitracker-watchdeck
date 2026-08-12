@@ -33,18 +33,30 @@ test.describe('Collection pagination', () => {
     await page.goto('/collection');
 
     const pager = page.getByRole('navigation', { name: 'Collection pages' });
+    const titles = page.locator('.grid p.truncate');
+
+    // The pager label updates from `page` state immediately, but the grid is
+    // swapped for a "Loading..." block while the fetch is in flight — so always
+    // wait for content to settle before reading titles.
+    const settled = async () => {
+      await expect(page.getByText('Loading...')).toBeHidden();
+      await expect(titles.first()).toBeVisible();
+    };
+
     await expect(pager, 'pager is rendered when total exceeds one page').toBeVisible();
     await expect(pager).toContainText('Page 1 of');
+    await settled();
 
-    const firstPageTitles = await page.locator('.grid p.truncate').allTextContents();
+    const firstPageTitles = await titles.allTextContents();
     expect(firstPageTitles.length).toBeGreaterThan(0);
 
     await expect(page.getByRole('button', { name: /Prev/ })).toBeDisabled();
 
     await page.getByRole('button', { name: /Next/ }).click();
     await expect(pager).toContainText('Page 2 of');
+    await settled();
 
-    const secondPageTitles = await page.locator('.grid p.truncate').allTextContents();
+    const secondPageTitles = await titles.allTextContents();
     expect(secondPageTitles.length, 'page 2 has items').toBeGreaterThan(0);
     expect(
       secondPageTitles,
@@ -53,6 +65,8 @@ test.describe('Collection pagination', () => {
 
     await page.getByRole('button', { name: /Prev/ }).click();
     await expect(pager).toContainText('Page 1 of');
+    await settled();
+    expect(await titles.allTextContents()).toEqual(firstPageTitles);
   });
 
   test('changing a filter resets to page 1', async ({ page }) => {
