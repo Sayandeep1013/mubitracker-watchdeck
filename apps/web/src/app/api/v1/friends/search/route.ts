@@ -17,16 +17,25 @@ export async function GET(request: NextRequest) {
     const supabase = createSupabaseAdminClient();
     const prefix = normalizeUsername(q);
 
-    // Findable by username regardless of profile_visibility — usernames aren't
-    // sensitive, and defaulting new accounts to 'private' made search return
-    // nothing for basically everyone. Visibility still gates profile/collection
-    // *content* separately (canViewCollection / getFriendProfile).
-    const { data: profiles, error } = await supabase
-      .from('profiles')
-      .select('id, username, avatar_url, profile_visibility')
-      .ilike('username', `${prefix}%`)
-      .neq('id', user.id)
-      .limit(limit);
+    // Privacy rule (spec 12 §2, locked): exact username → anyone;
+    // partial/prefix search → public profiles only. This prevents enumerating
+    // private accounts while still letting you find someone whose exact handle
+    // you already know (spec 12 §1 goal 5).
+    const [{ data: prefixMatches, error }, { data: exactMatch }] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, username, avatar_url')
+        .eq('profile_visibility', 'public')
+        .ilike('username', `${prefix}%`)
+        .neq('id', user.id)
+        .limit(limit),
+      supabase
+        .from('profiles')
+        .select('id, username, avatar_url')
+        .eq('username', prefix)
+        .neq('id', user.id)
+        .maybeSingle(),
+    ]);
 
     if (error) return apiError('DB_ERROR', error.message, 500);
 
@@ -43,8 +52,16 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const results = (profiles ?? [])
-      .filter((p) => !excluded.has(p.id))
+    // Exact match first, then public prefix matches, de-duplicated.
+    const merged = [...(exactMatch ? [exactMatch] : []), ...(prefixMatches ?? [])];
+    const seen = new Set<string>();
+    const results = merged
+      .filter((p) => {
+        if (excluded.has(p.id) || seen.has(p.id)) return false;
+        seen.add(p.id);
+        return true;
+      })
+      .slice(0, limit)
       .map((p) => ({ id: p.id, username: p.username, avatarUrl: p.avatar_url }));
 
     return apiOk({ results });
