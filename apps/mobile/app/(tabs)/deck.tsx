@@ -27,6 +27,8 @@ export default function DeckScreen() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [lastAction, setLastAction] = useState<LastAction | null>(null);
   const [undoing, setUndoing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const fetching = useRef(false);
@@ -48,10 +50,19 @@ export default function DeckScreen() {
       });
       setCursor(data.cursor);
       setSessionId(data.sessionId);
-    } catch {
-      // offline — use cached queue
+      setLoadError(null);
+    } catch (err) {
+      // Only surface the error if we have nothing cached to show instead —
+      // a mid-session hiccup with an already-loaded queue shouldn't interrupt.
+      setQueue((q) => {
+        if (q.length === 0) {
+          setLoadError(err instanceof Error ? err.message : 'Failed to load deck');
+        }
+        return q;
+      });
     } finally {
       fetching.current = false;
+      setInitialLoadDone(true);
     }
   }, [cursor, sessionId]);
 
@@ -146,9 +157,33 @@ export default function DeckScreen() {
   }));
 
   if (!current) {
+    if (!initialLoadDone) {
+      return (
+        <View style={styles.center}>
+          <Text style={styles.muted}>Loading deck…</Text>
+        </View>
+      );
+    }
+    if (loadError) {
+      return (
+        <View style={styles.center}>
+          <Text style={styles.errorText}>{loadError}</Text>
+          <Pressable
+            style={({ pressed }) => [styles.retryButton, pressed && styles.undoButtonPressed]}
+            onPress={() => {
+              setLoadError(null);
+              setInitialLoadDone(false);
+              loadDeck();
+            }}
+          >
+            <Text style={styles.undoButtonText}>Retry</Text>
+          </Pressable>
+        </View>
+      );
+    }
     return (
       <View style={styles.center}>
-        <Text style={styles.muted}>Loading deck…</Text>
+        <Text style={styles.muted}>No titles match — try again later</Text>
       </View>
     );
   }
@@ -202,6 +237,15 @@ const styles = StyleSheet.create({
   },
   undoButtonPressed: { opacity: 0.6 },
   undoButtonText: { color: '#f4f4f5', fontSize: 13, fontWeight: '600' },
+  errorText: { color: '#f87171', fontSize: 14, textAlign: 'center', marginBottom: 16, paddingHorizontal: 24 },
+  retryButton: {
+    backgroundColor: '#18181b',
+    borderColor: '#27272a',
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
   card: { alignItems: 'center', width: '100%' },
   poster: { width: 220, height: 330, borderRadius: 12, marginBottom: 16 },
   posterPlaceholder: { backgroundColor: '#27272a' },
