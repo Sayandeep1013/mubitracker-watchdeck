@@ -39,3 +39,9 @@ pnpm-debug.log*
 
 # Stray root-level QA/screenshot artifacts (Maestro etc.)
 /*.png
+
+# Playwright
+test-results
+playwright-report
+blob-report
+.playwright
