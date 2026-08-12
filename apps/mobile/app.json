@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Watchdeck",
+    "slug": "watchdeck",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "watchdeck",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.watchdeck.mobile"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#09090b"
+      },
+      "package": "app.watchdeck.mobile"
+    },
+    "plugins": ["expo-router", "expo-secure-store"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

@@ -1,0 +1,11 @@
+# For local development with Supabase CLI:
+#   supabase start
+#   supabase db push
+
+project_id = "deslckxkuvbfugdxibdn"
+
+[api]
+enabled = true
+
+[db]
+major_version = 15

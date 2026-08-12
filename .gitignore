@@ -1,0 +1,38 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build
+.next
+dist
+out
+.turbo
+
+# Env
+.env
+.env.local
+.env*.local
+
+# IDE
+.idea
+.vscode
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Expo
+apps/mobile/.expo
+apps/mobile/dist
+
+# Supabase
+supabase/.branches
+supabase/.temp
+
+# Debug
+npm-debug.log*
+pnpm-debug.log*
+
+# Agent/session tooling state
+.sisyphus
