@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -8,16 +8,25 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import type { DeckItem } from '@mubitracker/shared';
+import type { DeckItem, ReviewStatus, WatchStatus } from '@mubitracker/shared';
 import { tmdbPosterUrl } from '@mubitracker/shared';
 import { apiClient } from '@/lib/api';
 import { enqueueOfflineAction, syncOfflineQueue } from '@/lib/offline-queue';
+
+interface LastAction {
+  mediaId: string;
+  title: string;
+  previousStatus: WatchStatus;
+  previousReviewStatus: ReviewStatus;
+}
 
 export default function DeckScreen() {
   const [queue, setQueue] = useState<DeckItem[]>([]);
   const [index, setIndex] = useState(0);
   const [cursor, setCursor] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [lastAction, setLastAction] = useState<LastAction | null>(null);
+  const [undoing, setUndoing] = useState(false);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const fetching = useRef(false);
@@ -57,7 +66,16 @@ export default function DeckScreen() {
   const performAction = async (status: 'watched' | 'unwatched', reviewLater = false) => {
     if (!current) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const prevStatus = current.userStatus ?? 'unwatched';
     const prevReview = current.userReviewStatus ?? 'none';
+    if (!reviewLater) {
+      setLastAction({
+        mediaId: current.id,
+        title: current.title,
+        previousStatus: prevStatus,
+        previousReviewStatus: prevReview,
+      });
+    }
     setIndex((i) => i + 1);
     try {
       if (reviewLater) {
@@ -75,6 +93,30 @@ export default function DeckScreen() {
         reviewStatus: reviewLater ? 'pending' : 'none',
         timestamp: new Date().toISOString(),
       });
+    }
+  };
+
+  const handleUndo = async () => {
+    if (!lastAction || undoing) return;
+    setUndoing(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setIndex((i) => Math.max(0, i - 1));
+    try {
+      await apiClient.undo({
+        media_id: lastAction.mediaId,
+        previous_status: lastAction.previousStatus,
+        previous_review_status: lastAction.previousReviewStatus,
+      });
+    } catch {
+      await enqueueOfflineAction({
+        mediaId: lastAction.mediaId,
+        status: lastAction.previousStatus,
+        reviewStatus: lastAction.previousReviewStatus,
+        timestamp: new Date().toISOString(),
+      });
+    } finally {
+      setLastAction(null);
+      setUndoing(false);
     }
   };
 
@@ -116,6 +158,17 @@ export default function DeckScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.hint}>← Haven&apos;t · Watched → · ↑ Review Later</Text>
+      {lastAction && (
+        <Pressable
+          onPress={handleUndo}
+          disabled={undoing}
+          style={({ pressed }) => [styles.undoButton, pressed && styles.undoButtonPressed]}
+        >
+          <Text style={styles.undoButtonText}>
+            {undoing ? 'Undoing…' : `↺ Undo "${lastAction.title}"`}
+          </Text>
+        </Pressable>
+      )}
       <GestureDetector gesture={pan}>
         <Animated.View style={[styles.card, animatedStyle]}>
           {poster ? (
@@ -137,6 +190,18 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#09090b', alignItems: 'center', justifyContent: 'center', padding: 16 },
   center: { flex: 1, backgroundColor: '#09090b', alignItems: 'center', justifyContent: 'center' },
   hint: { position: 'absolute', top: 60, color: '#71717a', fontSize: 12 },
+  undoButton: {
+    position: 'absolute',
+    top: 90,
+    backgroundColor: '#18181b',
+    borderColor: '#27272a',
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  undoButtonPressed: { opacity: 0.6 },
+  undoButtonText: { color: '#f4f4f5', fontSize: 13, fontWeight: '600' },
   card: { alignItems: 'center', width: '100%' },
   poster: { width: 220, height: 330, borderRadius: 12, marginBottom: 16 },
   posterPlaceholder: { backgroundColor: '#27272a' },
