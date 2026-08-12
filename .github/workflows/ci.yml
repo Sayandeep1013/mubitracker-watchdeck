@@ -34,4 +34,8 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
           SUPABASE_SERVICE_ROLE_KEY: placeholder
-          TMDB_API_KEY: placeholder
+          # These are the names the code actually reads (lib/tmdb/provider.ts).
+          # TMDB_API_KEY was set here but is referenced nowhere.
+          TMDB_V3_API_KEY: placeholder
+          TMDB_READ_ACCESS_TOKEN: placeholder
+          NEXT_PUBLIC_APP_URL: http://localhost:3000

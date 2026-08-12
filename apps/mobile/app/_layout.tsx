@@ -1,5 +1,6 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { supabase } from '@/lib/supabase';
@@ -14,13 +15,26 @@ function useAuthGuard() {
     let mounted = true;
 
     // getUser() (not getSession()) round-trips to Supabase, so a token whose
-    // underlying account no longer exists (deleted user, revoked session)
-    // is caught here instead of silently passing a stale local session.
-    supabase.auth.getUser().then(({ data, error }) => {
-      if (!mounted) return;
-      setAuthed(!error && !!data.user);
-      setChecked(true);
-    });
+    // underlying account no longer exists (deleted user, revoked session) is
+    // caught here instead of silently passing a stale local session.
+    //
+    // The .catch() is load-bearing: this call fails on a flaky/offline network,
+    // and without it `checked` stayed false forever while the layout rendered
+    // nothing — a permanent blank screen on app launch.
+    supabase.auth
+      .getUser()
+      .then(({ data, error }) => {
+        if (!mounted) return;
+        setAuthed(!error && !!data.user);
+      })
+      .catch(() => {
+        // Network failure — treat as unauthenticated so the user reaches the
+        // login screen and can retry, rather than being stuck on a blank view.
+        if (mounted) setAuthed(false);
+      })
+      .finally(() => {
+        if (mounted) setChecked(true);
+      });
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return;
@@ -51,15 +65,24 @@ export default function RootLayout() {
   const checked = useAuthGuard();
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={styles.root}>
       <StatusBar style="light" />
-      {checked && (
+      {checked ? (
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="login" />
           <Stack.Screen name="review/[id]" options={{ presentation: 'modal' }} />
         </Stack>
+      ) : (
+        <View style={styles.splash} accessibilityLabel="Loading Mubitracker">
+          <ActivityIndicator color="#ef4444" size="large" />
+        </View>
       )}
     </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  splash: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#09090b' },
+});

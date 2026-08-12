@@ -1,0 +1,59 @@
+# Regression: plan item 0.5 — undo desync after a review-later swipe.
+#
+# `performAction` skipped `setLastAction` when `reviewLater` was true but still
+# ran `setIndex(i + 1)`. The undo pill therefore kept naming the PREVIOUS card,
+# and tapping it undid the wrong title while rewinding to a different one.
+#
+# NOTE: mobile currently maps swipe-UP to Review Later. Plan item 3.6 unifies
+# the gesture map with web (↑ = Watch Later, ↓ = Review Later); when that lands,
+# change the swipe direction below and keep the assertion identical.
+
+appId: host.exp.exponent
+name: Undo names the correct title after review-later
+tags:
+  - regression
+  - deck
+---
+- runFlow: ../subflows/open-project.yaml
+- runFlow: ../subflows/sign-in.yaml
+
+- extendedWaitUntil:
+    visible: "Deck"
+    timeout: 45000
+
+# Card A — classify it normally so an undo entry definitely exists.
+- extractTextWithAI:
+    query: "The media title shown on the deck card, exactly as written"
+    outputVariable: titleA
+- swipe:
+    start: "20%, 50%"
+    end: "85%, 50%"
+    duration: 300
+- extendedWaitUntil:
+    visible: "Undo"
+    timeout: 10000
+- assertVisible: 'Undo "${titleA}"'
+
+# Card B — send it to Review Later with a swipe up.
+- extractTextWithAI:
+    query: "The media title shown on the deck card, exactly as written"
+    outputVariable: titleB
+- swipe:
+    start: "50%, 70%"
+    end: "50%, 25%"
+    duration: 300
+
+# The regression: this showed 'Undo "${titleA}"' because card B was never
+# recorded, even though the deck had already advanced past it.
+- extendedWaitUntil:
+    visible: "Undo"
+    timeout: 10000
+- assertVisible: 'Undo "${titleB}"'
+- takeScreenshot: undo-names-review-later-title
+
+# And undoing must restore that same title, not the earlier one.
+- tapOn: "Undo"
+- extendedWaitUntil:
+    notVisible: "Undoing"
+    timeout: 15000
+- assertVisible: "${titleB}"

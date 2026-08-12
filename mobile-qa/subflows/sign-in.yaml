@@ -1,0 +1,48 @@
+# Ensures the app is signed in, creating a fresh throwaway account if needed.
+#
+# Accounts use the `mqa` prefix so they are identifiable and cleanable
+# (spec 50 §5). There is no auth-bypass build flag yet, so this drives the
+# real signup UI.
+
+appId: host.exp.exponent
+---
+# Already signed in from a previous flow — nothing to do.
+- runFlow:
+    when:
+      visible: "Deck"
+    commands:
+      - assertVisible: "Deck"
+
+- runFlow:
+    when:
+      visible: "Username"
+    commands:
+      - evalScript: ${output.user = 'mqa' + String(Date.now()).slice(-9)}
+
+      - tapOn: "Need an account? Sign up"
+
+      - tapOn:
+          hint: "Username"
+      - inputText: ${output.user}
+      - hideKeyboard
+
+      - tapOn:
+          hint: "Password"
+      - inputText: "TestPass123!"
+      - hideKeyboard
+
+      # Google Password Manager can appear over the form.
+      - tapOn:
+          text: "No, thanks"
+          optional: true
+
+      - tapOn: "Create Account"
+
+      # And again after submitting, offering to save the new password.
+      - tapOn:
+          text: "Not now"
+          optional: true
+
+      - extendedWaitUntil:
+          visible: "Deck"
+          timeout: 45000

@@ -1,0 +1,25 @@
+# Mobile QA configuration — see docs/spec/50-pipeline.md §4
+#
+# The app runs inside Expo Go during development, so `app_id` is Expo Go's
+# package, not `app.mubitracker.mobile`. Switch to the latter once an EAS
+# development/production build is installed.
+
+app_id: host.exp.exponent
+platform: android
+env_file: apps/mobile/.env
+
+# Metro must already be running before any flow executes:
+#   pnpm --filter @mubitracker/mobile dev
+# Tunnel mode does not work on this network (exp.direct unreachable) — use LAN,
+# or `adb reverse tcp:8081 tcp:8081` for a USB-only connection.
+dev_server: exp://127.0.0.1:8081
+
+test_accounts_note: >
+  Flows create their own accounts with the `mqa` prefix and password
+  TestPass123! so they are identifiable and cleanable (spec 50 §5).
+  Signup goes through the app UI; there is no auth bypass build flag yet.
+
+notes: >
+  A no-op Maestro run costs roughly 24s on this setup, so these flows belong in
+  a nightly job rather than per-push CI. Google Password Manager dialogs can
+  interrupt input steps — flows dismiss them defensively with optional taps.

@@ -1,0 +1,56 @@
+# Regression: plan item 0.2 — tab screens never refreshed.
+#
+# Collection / Review Later / Profile used `useEffect(…, [])` with no
+# `useFocusEffect`. expo-router keeps tab screens mounted, so the effect ran
+# exactly once per session: you could classify a title on the Deck and
+# Collection would still show its previous state until the app restarted.
+#
+# Asserts that a classification made on the Deck is visible on Collection
+# without restarting the app.
+
+appId: host.exp.exponent
+name: Tabs refresh on focus
+tags:
+  - regression
+  - navigation
+---
+- runFlow: ../subflows/open-project.yaml
+- runFlow: ../subflows/sign-in.yaml
+
+- extendedWaitUntil:
+    visible: "Deck"
+    timeout: 45000
+
+# Capture the title on the current card, then classify it as watched.
+- extractTextWithAI:
+    query: "The media title shown on the deck card, exactly as written"
+    outputVariable: deckTitle
+
+- swipe:
+    start: "20%, 50%"
+    end: "85%, 50%"
+    duration: 300
+
+# Give the write time to land server-side before switching tabs.
+- extendedWaitUntil:
+    visible: "Undo"
+    timeout: 10000
+
+- tapOn: "Collection"
+- extendedWaitUntil:
+    notVisible: "Loading"
+    timeout: 20000
+
+# Before the fix this assertion failed: Collection still showed stale data
+# (or nothing at all) because it had fetched once at mount and never again.
+- assertVisible: "${deckTitle}"
+- takeScreenshot: collection-reflects-recent-classification
+
+# Profile stats should also be live rather than frozen at first mount.
+- tapOn: "Profile"
+- extendedWaitUntil:
+    visible: "Watched"
+    timeout: 20000
+- assertVisible: "Reviews"
+- assertVisible: "Friends"
+- takeScreenshot: profile-shows-stats

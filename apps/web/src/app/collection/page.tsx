@@ -38,11 +38,15 @@ export default function CollectionPage() {
   const [sort, setSort] = useState<string>('recent');
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [pageSize, setPageSize] = useState(24);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<'grid' | 'list'>('grid');
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const params = new URLSearchParams();
       if (statusFilter) params.set('status', statusFilter);
@@ -53,12 +57,20 @@ export default function CollectionPage() {
       params.set('page', String(page));
       const data = await client.getCollection(params);
       setItems(data.items as CollectionItem[]);
+      // Previously discarded, which is why pages beyond the first were
+      // unreachable — 77 of 101 items were invisible.
+      setTotal(data.total);
+      setPageSize(data.pageSize);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load collection');
     } finally {
       setLoading(false);
     }
   }, [client, statusFilter, q, sort, formatTab, classificationTab, page]);
 
   useEffect(() => { load(); }, [load]);
+
+  const totalPages = Math.max(1, Math.ceil(total / Math.max(1, pageSize)));
 
   return (
     <div className="p-4">
@@ -109,7 +121,7 @@ export default function CollectionPage() {
               statusFilter === s ? 'border-red-500/40 text-red-400' : 'border-neutral-800 text-neutral-500'
             }`}
           >
-            {s || 'All'}
+            {s ? s.charAt(0).toUpperCase() + s.slice(1) : 'All'}
           </button>
         ))}
         <select
@@ -129,7 +141,18 @@ export default function CollectionPage() {
         />
       </div>
 
-      {loading ? (
+      {error ? (
+        <div className="py-12 text-center">
+          <p className="mb-4 text-sm text-red-400">{error}</p>
+          <button
+            type="button"
+            onClick={load}
+            className="rounded-lg border border-neutral-700 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-900"
+          >
+            Retry
+          </button>
+        </div>
+      ) : loading ? (
         <div className="py-12 text-center text-sm text-neutral-600">Loading...</div>
       ) : items.length === 0 ? (
         <div className="py-12 text-center text-sm text-neutral-600">No items found</div>
@@ -164,6 +187,34 @@ export default function CollectionPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {!error && totalPages > 1 && (
+        <nav
+          aria-label="Collection pages"
+          className="mt-6 flex items-center justify-center gap-3 text-sm"
+        >
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1 || loading}
+            className="rounded-lg border border-neutral-800 px-3 py-1.5 text-neutral-400 transition-colors hover:border-neutral-700 hover:text-neutral-200 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            ← Prev
+          </button>
+          <span className="text-neutral-500" aria-live="polite">
+            Page {page} of {totalPages}
+            <span className="ml-2 text-neutral-700">({total} items)</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages || loading}
+            className="rounded-lg border border-neutral-800 px-3 py-1.5 text-neutral-400 transition-colors hover:border-neutral-700 hover:text-neutral-200 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Next →
+          </button>
+        </nav>
       )}
     </div>
   );

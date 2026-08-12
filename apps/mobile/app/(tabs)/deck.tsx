@@ -80,14 +80,15 @@ export default function DeckScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const prevStatus = current.userStatus ?? 'unwatched';
     const prevReview = current.userReviewStatus ?? 'none';
-    if (!reviewLater) {
-      setLastAction({
-        mediaId: current.id,
-        title: current.title,
-        previousStatus: prevStatus,
-        previousReviewStatus: prevReview,
-      });
-    }
+    // Record for EVERY action, review-later included. Previously this was
+    // skipped for review-later while the index still advanced, so the undo pill
+    // kept naming the prior card and undoing restored the wrong title.
+    setLastAction({
+      mediaId: current.id,
+      title: current.title,
+      previousStatus: prevStatus,
+      previousReviewStatus: prevReview,
+    });
     setIndex((i) => i + 1);
     try {
       if (reviewLater) {

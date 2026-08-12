@@ -1,0 +1,43 @@
+# Regression: plan item 0.1 — auth-guard blank screen.
+#
+# `supabase.auth.getUser()` had no `.catch()`. On a network failure the promise
+# rejected, `setChecked(true)` never ran, and because the layout rendered
+# `{checked && <Stack>}` the app sat on a permanently blank screen.
+#
+# This flow forces that exact condition with airplane mode and asserts the app
+# reaches the login screen instead of hanging.
+
+appId: host.exp.exponent
+name: Auth guard survives an offline launch
+tags:
+  - regression
+  - auth
+---
+- runFlow: ../subflows/open-project.yaml
+
+# Get to a known signed-out state first.
+- runFlow:
+    when:
+      visible: "Profile"
+    commands:
+      - tapOn: "Profile"
+      - tapOn: "Sign Out"
+      - extendedWaitUntil:
+          visible: "Username"
+          timeout: 20000
+
+- stopApp
+
+# Kill connectivity, then cold-launch.
+- setAirplaneMode: enabled
+- runFlow: ../subflows/open-project.yaml
+
+# The bug: neither of these ever appeared — the screen stayed blank forever.
+# A spinner is acceptable briefly, but the login form must arrive.
+- extendedWaitUntil:
+    visible: "Username"
+    timeout: 45000
+- assertVisible: "Sign In"
+- takeScreenshot: offline-launch-reaches-login
+
+- setAirplaneMode: disabled

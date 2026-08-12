@@ -1,0 +1,24 @@
+# Opens the Mubitracker project inside Expo Go.
+#
+# `am start -d exp://…` silently fails depending on Expo Go's state, so this
+# goes through the launcher and the "Recently opened" entry instead, which is
+# reliable. Metro must already be running.
+
+appId: host.exp.exponent
+---
+- launchApp:
+    clearState: false
+    stopApp: true
+
+- extendedWaitUntil:
+    visible: "Mubitracker"
+    timeout: 30000
+
+# Tapping the "Recently opened" row reconnects to the dev server.
+- tapOn: "Mubitracker"
+
+# First load bundles from scratch; allow generous time before deciding it hung.
+- extendedWaitUntil:
+    notVisible:
+      text: "Bundling"
+    timeout: 120000
