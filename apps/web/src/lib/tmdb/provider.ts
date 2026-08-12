@@ -156,6 +156,18 @@ export async function tmdbGetDetails(
   return normalized;
 }
 
+export async function tmdbGetExternalIds(
+  providerId: string,
+  format: MediaFormat,
+): Promise<{ imdbId: string | null }> {
+  const endpoint = format === 'movie' ? `movie/${providerId}/external_ids` : `tv/${providerId}/external_ids`;
+  const url = buildTmdbUrl(`/${endpoint}`);
+  const res = await rateLimitedFetch(url, getTmdbInit());
+  if (!res.ok) throw new Error(`TMDB external_ids failed: ${res.status}`);
+  const data = (await res.json()) as { imdb_id?: string | null };
+  return { imdbId: data.imdb_id ?? null };
+}
+
 export async function tmdbSmokeTest(): Promise<{ ok: boolean; title?: string; error?: string }> {
   try {
     const results = await tmdbSearch('The Prestige', 1);

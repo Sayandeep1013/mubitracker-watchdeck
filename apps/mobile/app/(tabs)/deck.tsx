@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -29,6 +29,7 @@ export default function DeckScreen() {
   const [undoing, setUndoing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
+  const [imdbLoading, setImdbLoading] = useState(false);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const fetching = useRef(false);
@@ -104,6 +105,19 @@ export default function DeckScreen() {
         reviewStatus: reviewLater ? 'pending' : 'none',
         timestamp: new Date().toISOString(),
       });
+    }
+  };
+
+  const openImdb = async () => {
+    if (!current || imdbLoading) return;
+    setImdbLoading(true);
+    try {
+      const { imdbUrl } = await apiClient.getImdbLink(current.id);
+      if (imdbUrl) await Linking.openURL(imdbUrl);
+    } catch {
+      // silently ignore — non-critical, secondary action
+    } finally {
+      setImdbLoading(false);
     }
   };
 
@@ -217,6 +231,9 @@ export default function DeckScreen() {
           </Text>
         </Animated.View>
       </GestureDetector>
+      <Pressable onPress={openImdb} disabled={imdbLoading} hitSlop={12}>
+        <Text style={styles.imdbLink}>{imdbLoading ? 'Opening…' : 'IMDb ↗'}</Text>
+      </Pressable>
     </View>
   );
 }
@@ -251,5 +268,6 @@ const styles = StyleSheet.create({
   posterPlaceholder: { backgroundColor: '#27272a' },
   title: { color: '#fff', fontSize: 22, fontWeight: '700', textAlign: 'center' },
   meta: { color: '#71717a', fontSize: 14, marginTop: 4 },
+  imdbLink: { color: '#71717a', fontSize: 13, marginTop: 16, fontWeight: '600' },
   muted: { color: '#71717a' },
 });

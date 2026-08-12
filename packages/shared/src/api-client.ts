@@ -54,6 +54,12 @@ export class MubitrackerClient {
     return this.fetch(`/api/v1/media/${id}`);
   }
 
+  getImdbLink(mediaId: string) {
+    return this.fetch<{ imdbId: string | null; imdbUrl: string | null }>(
+      `/api/v1/media/${mediaId}/imdb`,
+    );
+  }
+
   getDeck(params?: URLSearchParams) {
     const qs = params?.toString();
     return this.fetch<DeckResponse>(`/api/v1/deck${qs ? `?${qs}` : ''}`);

@@ -3,7 +3,9 @@
 import type { DeckItem } from '@mubitracker/shared';
 import { tmdbPosterUrl } from '@mubitracker/shared';
 import Image from 'next/image';
-import { IconBookmarkPlus, IconCheck, IconClock, IconX } from './icons';
+import { useState } from 'react';
+import { IconBookmarkPlus, IconCheck, IconClock, IconExternalLink, IconX } from './icons';
+import { useApiClient } from '@/hooks/useApiClient';
 
 type Action = 'unwatched' | 'watched' | 'review_later' | 'watch_later';
 
@@ -28,9 +30,24 @@ export function DeckCard({
   exitDirection = null,
   entering = false,
 }: DeckCardProps) {
+  const client = useApiClient();
+  const [imdbLoading, setImdbLoading] = useState(false);
   const posterUrl = tmdbPosterUrl(item.posterPath, 'deck');
   const rotation = dragX * 0.05;
   const opacity = 1 - Math.min(Math.abs(dragX) / 300, 0.3);
+
+  const openImdb = async () => {
+    if (imdbLoading) return;
+    setImdbLoading(true);
+    try {
+      const { imdbUrl } = await client.getImdbLink(item.id);
+      if (imdbUrl) window.open(imdbUrl, '_blank', 'noopener,noreferrer');
+    } catch {
+      // silently ignore — non-critical, secondary action
+    } finally {
+      setImdbLoading(false);
+    }
+  };
 
   const exitClass =
     exitDirection === 'left'
@@ -90,6 +107,15 @@ export function DeckCard({
         <p className="mt-1 text-sm text-neutral-500">
           {item.year ?? '—'} · {item.displayType} · {item.originalLanguage.toUpperCase()}
         </p>
+        <button
+          type="button"
+          onClick={openImdb}
+          disabled={imdbLoading}
+          className="mt-2 inline-flex items-center gap-1 text-xs text-neutral-600 transition-colors hover:text-amber-400 disabled:opacity-50"
+        >
+          <IconExternalLink size={12} />
+          {imdbLoading ? 'Opening…' : 'IMDb'}
+        </button>
         {item.overview && (
           <p className="mt-3 line-clamp-3 max-w-md text-sm text-neutral-600">{item.overview}</p>
         )}
