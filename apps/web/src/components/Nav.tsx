@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -31,8 +32,8 @@ export function Nav() {
       <nav className="hidden md:flex md:w-52 md:shrink-0 md:flex-col md:gap-1 md:border-r md:border-neutral-800/50 md:bg-neutral-950 md:p-4">
         <div className="mb-6 flex items-center justify-between">
           <Link href="/deck" className="flex items-center gap-2">
-            <span className="text-xl font-black tracking-tighter text-red-500">W</span>
-            <span className="text-sm font-bold tracking-tight text-neutral-200">ATCHDECK</span>
+            <Image src="/logo.png" alt="" width={24} height={24} className="rounded-md" />
+            <span className="text-sm font-bold tracking-tight text-neutral-200">MUBITRACKER</span>
           </Link>
           <NotificationBell />
         </div>

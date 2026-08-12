@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { usernameToAuthEmail } from '@mubitracker/shared';
@@ -56,9 +57,9 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-neutral-950 p-4">
       <div className="w-full max-w-sm">
-        <div className="mb-2 text-center">
-          <span className="text-4xl font-black tracking-tighter text-red-500">W</span>
-          <span className="text-2xl font-bold tracking-tight text-neutral-200">ATCHDECK</span>
+        <div className="mb-2 flex items-center justify-center gap-3">
+          <Image src="/logo.png" alt="" width={40} height={40} className="rounded-xl" />
+          <span className="text-2xl font-bold tracking-tight text-neutral-200">MUBITRACKER</span>
         </div>
         <p className="mb-8 text-center text-sm text-neutral-600">
           Track media at the speed of thought
