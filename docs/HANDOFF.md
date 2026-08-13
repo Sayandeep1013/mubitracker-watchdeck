@@ -68,7 +68,7 @@ When you finish a stage, update this prompt block and tell me what
 changed.
 ```
 
-**Current position: Stage 1, all of Stage 2 (2.1-2.7), all of Stage 3 (3.1-3.8), and all of Stage 4 (4.1-4.13) shipped (`2026-08-13`). Deck v2 is behind `DECK_ENGINE=v2` (unset in prod); Stage 2.8 needs the user's go-ahead before flipping the flag. Stage 3.8 and Stage 4's web-verifiable items (4.6-4.9, 4.12, 4.13, plus 4.1's web half) are `[x]`, verified live; everything mobile-touching is `[~]` (typecheck-only, no device this session) — Stage 3.1-3.7 plus Stage 4's 4.1 mobile half, 4.2, 4.3, 4.4, 4.5, 4.10, 4.11, and 4.13's mobile half. Next up: Stage 5 (pipeline & observability).**
+**Current position: Stage 1, all of Stage 2 (2.1-2.7), all of Stage 3 (3.1-3.8), and all of Stage 4 (4.1-4.13) shipped (`2026-08-13`, main at `64bc79a`). Deck v2 is behind `DECK_ENGINE=v2` (unset in prod); Stage 2.8 needs the user's go-ahead before flipping the flag. Stage 3.8 and Stage 4's web-verifiable items (4.6-4.9, 4.12, 4.13, plus 4.1's web half) are `[x]`, verified live; everything mobile-touching is `[~]` (typecheck-only, no device this session) — Stage 3.1-3.7 plus Stage 4's 4.1 mobile half, 4.2, 4.3, 4.4, 4.5, 4.10, 4.11, and 4.13's mobile half. `main`'s production build (`pnpm --filter @mubitracker/web build`, not just typecheck) is confirmed green as of `64bc79a` — see the Session Log entry above this line for a real build break that slipped through mid-session and how it was caught. Next up: Stage 5 (pipeline & observability).**
 
 ### Pending verification
 
@@ -120,6 +120,18 @@ This is the mechanism that lets a session run without the user in the loop. Foll
 ## Session Log
 
 Newest first. One line per completed item; a block per stage.
+
+### 2026-08-13 — Fix: production build broken by 4.13's Suspense gap — `64bc79a`
+
+**Main was broken for ~15 minutes across two commits (`5ad4e02`, `a97985b`)** — caught and fixed same-session, but worth recording exactly how it happened since it slipped past every check that had worked all session up to this point.
+
+4.13 added `useSearchParams()` to `apps/web/src/app/friends/page.tsx` (for the `?tab=incoming` deep link from the notification toast/badge). Next.js requires any page using `useSearchParams()` to be wrapped in `<Suspense>` or `next build`'s static-prerendering step fails outright — `pnpm typecheck` (`tsc --noEmit`) does not catch this, and neither does running the app against `pnpm dev` (the dev server never does static prerendering), which is exactly the mechanism every live Playwright verification this session ran against. So the bug was invisible to both checks I'd been relying on, and only `pnpm --filter @mubitracker/web build` — one specific CI step — actually exercises it.
+
+**Why it went unnoticed at commit time:** GitHub's unauthenticated REST API rate limit (60 req/hour) was exhausted from the volume of CI-status polling this session, right when the 4.13 and Stage-4-completion docs commits landed. Both `curl` checks returned a rate-limit error instead of a status, and I moved on to the next item rather than confirming green — the exact failure mode the established "confirm CI green after every push" protocol exists to catch, undermined by not having a fallback for the check itself being unavailable.
+
+**Fix:** split `FriendsPage` into a thin `<Suspense>`-wrapping default export plus a `FriendsPageInner` holding the actual `useSearchParams()` call and all prior logic — mirrors the existing pattern in `app/deck/page.tsx`, which already wraps `DeckView.tsx`'s own `useSearchParams()` usage the same way (that's why `/deck` never broke despite using the same hook). Verified by running `pnpm --filter @mubitracker/web build` **locally** with CI's placeholder env vars before pushing — confirmed `/friends` now prerenders as a static route — then pushed and polled CI directly (not through the rate-limited endpoint pattern) until it returned `"conclusion": "success"` on `64bc79a`.
+
+**Durable lesson:** `pnpm typecheck` and a locally-`pnpm dev`-verified live test are NOT sufficient proof a page builds — any new `useSearchParams()`/`useSelectedLayoutSegment()`-style hook needs an actual `pnpm --filter @mubitracker/web build` (or a genuinely confirmed-green CI run) before considering the item done. When the GitHub API is rate-limited, don't treat "couldn't check" as equivalent to "probably fine" — either wait it out, or run the build locally as a substitute, rather than proceeding on an unconfirmed push.
 
 ### 2026-08-13 — Stage 4.12/4.13 (reviews list, notifications alignment) — `73ab369`, `5ad4e02`
 
