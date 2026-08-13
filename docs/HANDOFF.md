@@ -73,7 +73,7 @@ When you finish a stage, update this prompt block and tell me what
 changed.
 ```
 
-**Current position: Stage 1, all of Stage 2 (2.1-2.7), all of Stage 3 (3.1-3.8), and Stage 4.1/4.7-4.9 shipped (`2026-08-13`). Deck v2 is behind `DECK_ENGINE=v2` (unset in prod); Stage 2.8 needs the user's go-ahead before flipping the flag. Stage 3.8 and 4.7-4.9 are `[x]`, verified live; 4.1 is `[~]` (web half verified live, mobile half typecheck-only). Stage 3.1-3.7 (mobile) is `[~]` — code-complete/typecheck-clean but no Android device this session. Next up: 4.2 (mobile friends UI, the largest remaining item), then 4.3-4.6/4.10-4.13 — mobile-only items to be implemented theoretically per the no-device policy, with pending tests recorded for later.**
+**Current position: Stage 1, all of Stage 2 (2.1-2.7), all of Stage 3 (3.1-3.8), and Stage 4.1/4.2/4.7-4.9 shipped (`2026-08-13`). Deck v2 is behind `DECK_ENGINE=v2` (unset in prod); Stage 2.8 needs the user's go-ahead before flipping the flag. Stage 3.8 and 4.7-4.9 are `[x]`, verified live; 4.1 and 4.2 are `[~]` (4.1's web half verified live; both are typecheck-only on mobile). Stage 3.1-3.7 (mobile) is `[~]` — code-complete/typecheck-clean but no Android device this session. Next up: 4.3-4.6/4.10-4.13 — mostly mobile-only items to be implemented theoretically per the no-device policy, with pending tests recorded for later; 4.6 is web-only and verifiable live.**
 
 ### Pending verification
 
@@ -119,6 +119,22 @@ This is the mechanism that lets a session run without the user in the loop. Foll
 ## Session Log
 
 Newest first. One line per completed item; a block per stage.
+
+### 2026-08-13 — Stage 4.2 (mobile friends UI) — `a5394b9`
+
+Spec [`40`](spec/40-friends-v2.md) §3. Largest remaining Stage 4 item — mobile had zero social surface.
+
+| Item | Change |
+|---|---|
+| New Friends tab | `(tabs)/friends.tsx`: segmented Friends/Incoming/Outgoing/Blocked, Copy handle, the first-run discoverability nudge (deferred from 4.1 since there was no screen to put it on yet), inline row actions (Accept/Decline/Block/Cancel/Unblock), all awaited with try/catch + toast on both outcomes. |
+| Add friend | `friends/add.tsx` modal: exact-handle send + 250ms-debounced prefix search with per-row Add. |
+| Friend detail | `friends/[id].tsx`: counts, Compare, Their Deck, Block/Unblock (gated on a `friendship_id` passed through the list navigation — block/unblock act on the friendship row, not the user id, which the list already had and the detail route otherwise wouldn't). |
+| Notifications | New `lib/notifications.tsx` (`NotificationsProvider`/`useNotifications`, 30s poll, one toast per newly-seen unread `friend_request` — mirrors web's `NotificationBell`), feeding a badge on both the tab icon and a header bell button. `friends/notifications.tsx` modal marks all read on open and deep-links a tapped `friend_request` back to Friends with Incoming pre-selected. |
+| Their Deck actually works | `(tabs)/deck.tsx` now reads `friend_id`/`friend_mode` from route params (`useLocalSearchParams`) and forwards them on every `getDeck()` call — previously there was no mobile route capable of viewing a friend's deck at all, even though the backend (4.7) already supported it. No other deck logic touched. |
+
+**Verified:** typecheck-only. `pnpm typecheck` clean across the full monorepo (shared/web/mobile). No Android device connected this session. New Maestro flow `mobile-qa/flows/friends-ui.yaml` covers the single-device-reachable surface (tab nav, nudge, all four tabs' empty states, add-friend modal, notifications modal) — written, never run. It explicitly cannot cover request/accept/block/unblock/Compare/Their Deck, which need a second identity (second device, or simulating one via direct backend API calls per the autonomous-mobile-qa skill) — noted in the flow's header rather than silently claimed as covered.
+
+**One local-only gotcha worth remembering, not a real bug:** running `npx expo export` locally to try to force-regenerate `.expo/types/router.d.ts` (for stricter `router.push()` typing) produces a stale/partial file that then makes `tsc` fail on any route not in it — including routes that existed before this session. `.expo/types` is gitignored and never present in a fresh CI checkout, so CI's `pnpm typecheck` always sees expo-router's permissive fallback (any string route accepted). Deleting a locally-generated `.expo/types` directory restores parity with CI. Don't chase "route not assignable" errors that only reproduce after manually running `expo export` — check `.expo/types` exists locally before trusting them.
 
 ### 2026-08-13 — Stage 4.1 (privacy settings UI) — `5502a19`
 

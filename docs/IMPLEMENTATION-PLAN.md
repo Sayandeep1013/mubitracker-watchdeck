@@ -145,7 +145,8 @@ Spec [`40`](spec/40-friends-v2.md). Requires Stage 3 tokens for consistency.
 
 - [~] **4.1 Privacy settings UI** — no UI exists to change `profile_visibility`, which is the actual reason public friend search finds nobody.
   > Web: Privacy card on `/profile` (3 selects, optimistic save) + Copy handle; first-run nudge on `/friends`. Verified live in a real headless browser — `[x]` for the web half. Mobile: same toggle + Copy handle on Profile, typecheck-only (no device) — `[~]` for the mobile half, hence the combined `[~]`. Mobile's first-run nudge lands with 4.2 (mobile Friends screen doesn't exist yet).
-- [ ] **4.2 Mobile friends UI** — currently 100% absent; the shared client already has 11 friends methods.
+- [~] **4.2 Mobile friends UI** — currently 100% absent; the shared client already has 11 friends methods.
+  > New Friends tab: list (Friends/Incoming/Outgoing/Blocked segmented), add-friend modal, friend detail (Compare/Their Deck/Block/Unblock), notifications modal + badge, first-run nudge (deferred from 4.1). `deck.tsx` now forwards `friend_id`/`friend_mode` so Their Deck works. Typecheck-only — no device this session. Maestro flow `mobile-qa/flows/friends-ui.yaml` covers the single-device-reachable surface; written, never run.
 - [ ] **4.3 Mobile filters + presets** — entirely absent.
 - [ ] **4.4 Mobile Watch Later** — no gesture, action, screen, or tab.
 - [ ] **4.5 Mobile undo depth 1 → 20** to match web.
