@@ -44,6 +44,16 @@ const ACTION_META: Record<
   review_later: { label: 'Review Later', icon: 'bookmark', tint: color.review, dir: 'down' },
 };
 
+function hasFilterValues(filters: ReturnType<typeof useFilters>['filters']): boolean {
+  return Object.values(filters).some((v) => (Array.isArray(v) ? v.length > 0 : v != null && v !== ''));
+}
+
+function filterKeys(filters: ReturnType<typeof useFilters>['filters']): string[] {
+  return Object.entries(filters)
+    .filter(([, v]) => (Array.isArray(v) ? v.length > 0 : v != null && v !== ''))
+    .map(([k]) => k);
+}
+
 export default function DeckScreen() {
   const insets = useSafeAreaInsets();
   const showToast = useToast();
@@ -90,10 +100,21 @@ export default function DeckScreen() {
 
   const fetching = useRef(false);
   const busy = useRef(false);
+  // Analytics (spec 50 §6) — mirrors web DeckView.tsx's refs.
+  const filtersApplied = useRef(false);
+  const batchesServedThisSession = useRef(0);
+  const cardShownAt = useRef(Date.now());
 
   const current = queue[index];
 
-  const loadDeck = useCallback(async (overrides?: { cursor: string | null; sessionId: string | null }) => {
+  useEffect(() => {
+    if (current) cardShownAt.current = Date.now();
+  }, [current?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadDeck = useCallback(async (
+    overrides?: { cursor: string | null; sessionId: string | null },
+    reason?: 'initial' | 'filter_change',
+  ) => {
     if (fetching.current) return;
     fetching.current = true;
     // On a filter change the caller passes explicit nulls — cursor/sessionId
@@ -101,6 +122,7 @@ export default function DeckScreen() {
     // `sessionId` here would still reuse the previous filter set's values.
     const activeCursor = overrides ? overrides.cursor : cursor;
     const activeSessionId = overrides ? overrides.sessionId : sessionId;
+    const fetchStart = Date.now();
     try {
       await syncOfflineQueue();
       const params = deckFiltersToSearchParams(filters);
@@ -113,6 +135,7 @@ export default function DeckScreen() {
         if (activeSessionId) params.set('session_id', activeSessionId);
       }
       const data = await apiClient.getDeck(params);
+      const latencyMs = Date.now() - fetchStart;
       if (engineMode.current === null) engineMode.current = data.bucketId ? 'v2' : 'v1';
 
       setQueue((q) => {
@@ -126,6 +149,33 @@ export default function DeckScreen() {
         setSessionId(data.sessionId ?? null);
       }
       setLoadError(null);
+
+      batchesServedThisSession.current += 1;
+      const filtered = hasFilterValues(filters);
+      const keys = filterKeys(filters);
+      apiClient.trackEvent({
+        event: 'deck_batch_served',
+        properties: {
+          count: data.items.length,
+          latency_ms: latencyMs,
+          filtered,
+          filter_keys: keys,
+          cursor_null: engineMode.current === 'v1' ? data.cursor == null : false,
+          source: overrides ? 'cold' : 'prefetch',
+        },
+      });
+      if (reason === 'filter_change') {
+        apiClient.trackEvent({
+          event: 'filter_applied',
+          properties: { filter_keys: keys, preset: false, latency_ms: latencyMs, result_count: data.items.length },
+        });
+      }
+      if (data.items.length === 0) {
+        apiClient.trackEvent({
+          event: 'deck_empty',
+          properties: { filtered, filter_keys: keys, batches_served_this_session: batchesServedThisSession.current },
+        });
+      }
     } catch (err) {
       // Only surface the error if we have nothing cached to show instead —
       // a mid-session hiccup with an already-loaded queue shouldn't interrupt.
@@ -149,7 +199,9 @@ export default function DeckScreen() {
     setDeckExhausted(false);
     setLoadError(null);
     engineMode.current = null;
-    loadDeck({ cursor: null, sessionId: null });
+    batchesServedThisSession.current = 0;
+    loadDeck({ cursor: null, sessionId: null }, filtersApplied.current ? 'filter_change' : 'initial');
+    filtersApplied.current = true;
   }, [filters]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -189,10 +241,11 @@ export default function DeckScreen() {
   );
 
   const performAction = useCallback(
-    async (action: Action) => {
+    async (action: Action, input: 'swipe' | 'button' = 'button') => {
       if (!current) return;
       const prevStatus = current.userStatus ?? 'unwatched';
       const prevReview = current.userReviewStatus ?? 'none';
+      const msSinceCardShown = Date.now() - cardShownAt.current;
       setUndoStack((s) =>
         [
           {
@@ -206,6 +259,17 @@ export default function DeckScreen() {
           ...s,
         ].slice(0, MAX_UNDO_STACK),
       );
+
+      apiClient.trackEvent({
+        event: 'media_classified',
+        properties: {
+          media_id: current.id,
+          status: action,
+          input,
+          ms_since_card_shown: msSinceCardShown,
+          platform: 'mobile',
+        },
+      });
 
       Haptics.impactAsync(
         action === 'watched' || action === 'unwatched'
@@ -236,7 +300,7 @@ export default function DeckScreen() {
   );
 
   const commitExit = useCallback(
-    (action: Action) => {
+    (action: Action, input: 'swipe' | 'button' = 'button') => {
       if (!current || busy.current) return;
       busy.current = true;
       busyShared.value = true;
@@ -256,13 +320,13 @@ export default function DeckScreen() {
         if (done) runOnJS(advanceAfterExit)(action);
       });
 
-      performAction(action);
+      performAction(action, input);
     },
     [advanceAfterExit, busyShared, current, dragOpacity, performAction, tx, ty, cueLatched],
   );
 
   const handleConfirm = useCallback(() => {
-    commitExit(selectedAction);
+    commitExit(selectedAction, 'button');
   }, [commitExit, selectedAction]);
 
   const handleSelectAction = useCallback((action: Action) => {
@@ -290,6 +354,7 @@ export default function DeckScreen() {
   const handleUndo = async () => {
     const lastAction = undoStack[0];
     if (!lastAction || undoing) return;
+    const depth = undoStack.length;
     setUndoing(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setIndex((i) => Math.max(0, i - 1));
@@ -300,6 +365,10 @@ export default function DeckScreen() {
         previous_review_status: lastAction.previousReviewStatus,
         previous_reject_count: lastAction.previousRejectCount,
         previous_hidden_until: lastAction.previousHiddenUntil,
+      });
+      apiClient.trackEvent({
+        event: 'undo_used',
+        properties: { depth, restored_status: lastAction.previousStatus, platform: 'mobile' },
       });
       showToast({ message: 'Undone', tone: 'neutral' });
     } catch {
@@ -336,19 +405,19 @@ export default function DeckScreen() {
     .onEnd((e) => {
       if (busyShared.value) return;
       if (e.translationX > motion.SWIPE_THRESHOLD_X) {
-        runOnJS(commitExit)('watched');
+        runOnJS(commitExit)('watched', 'swipe');
         return;
       }
       if (e.translationX < -motion.SWIPE_THRESHOLD_X) {
-        runOnJS(commitExit)('unwatched');
+        runOnJS(commitExit)('unwatched', 'swipe');
         return;
       }
       if (e.translationY < -motion.SWIPE_THRESHOLD_Y) {
-        runOnJS(commitExit)('watch_later');
+        runOnJS(commitExit)('watch_later', 'swipe');
         return;
       }
       if (e.translationY > motion.SWIPE_THRESHOLD_Y) {
-        runOnJS(commitExit)('review_later');
+        runOnJS(commitExit)('review_later', 'swipe');
         return;
       }
       tx.value = withSpring(0, motion.SPRING);
