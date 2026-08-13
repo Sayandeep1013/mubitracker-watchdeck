@@ -13,7 +13,7 @@ import { IconSliders } from './icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ActionToast, type ToastState } from './ActionToast';
-import { DeckCard } from './DeckCard';
+import { DeckCard, DeckCardSkeleton } from './DeckCard';
 import { FilterDrawer } from './FilterDrawer';
 import { useApiClient } from '@/hooks/useApiClient';
 
@@ -33,6 +33,7 @@ export function DeckView() {
   const [selectedAction, setSelectedAction] = useState<Action>('unwatched');
   const stickyAction = useRef<Action>('unwatched');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   // Bucket mode (DECK_ENGINE=v2) has no cursor concept — "more" always
@@ -49,7 +50,7 @@ export function DeckView() {
   const [toast, setToast] = useState<ToastState | null>(null);
   const [dragX, setDragX] = useState(0);
   const [dragY, setDragY] = useState(0);
-  const [exitDirection, setExitDirection] = useState<'left' | 'right' | 'up' | null>(null);
+  const [exitDirection, setExitDirection] = useState<'left' | 'right' | 'up' | 'down' | null>(null);
   const [entering, setEntering] = useState(true);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
   const fetching = useRef(false);
@@ -98,6 +99,7 @@ export function DeckView() {
         const data = await client.getDeck(params);
         if (engineMode.current === null) engineMode.current = data.bucketId ? 'v2' : 'v1';
 
+        setLoadError(null);
         setQueue((q) => [...q, ...data.items]);
         if (engineMode.current === 'v2') {
           // No cursor to exhaust — track explicitly so the prefetch effect
@@ -121,10 +123,16 @@ export function DeckView() {
           showToast({ message: 'Still finding more titles for you…', tone: 'neutral' });
         }
       } catch (e) {
-        showToast({
-          message: e instanceof Error ? e.message : 'Failed to load deck',
-          tone: 'error',
-        });
+        const message = e instanceof Error ? e.message : 'Failed to load deck';
+        // Only the initial/filter-change load (called with `overrides`) blocks
+        // the whole screen on failure — a background prefetch failing while
+        // cards are still on-screen should stay silent-ish (a toast) and just
+        // retry on the next advance, per spec 32 §7.
+        if (overrides) {
+          setLoadError(message);
+        } else {
+          showToast({ message, tone: 'error' });
+        }
       } finally {
         fetching.current = false;
         setLoading(false);
@@ -139,6 +147,7 @@ export function DeckView() {
     setCursor(null);
     setSessionId(null);
     setDeckExhausted(false);
+    setLoadError(null);
     engineMode.current = null;
     setLoading(true);
     setEntering(true);
@@ -215,7 +224,7 @@ export function DeckView() {
             ? 'left'
             : action === 'watch_later'
               ? 'up'
-              : 'up';
+              : 'down';
       setExitDirection(dir);
 
       window.setTimeout(() => {
@@ -336,6 +345,48 @@ export function DeckView() {
     touchStart.current = null;
   };
 
+  if (!loading && loadError && queue.length === 0) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-8">
+        <div className="text-center animate-deck-enter">
+          <p className="mb-2 text-lg text-neutral-400">Couldn&apos;t load the deck</p>
+          <p className="text-sm text-neutral-600">{loadError}</p>
+          <div className="mt-4 flex justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setLoadError(null);
+                setLoading(true);
+                fetchBatch({ cursor: null, sessionId: null });
+              }}
+              className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-500"
+            >
+              Retry
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowFilters(true)}
+              className="rounded-lg border border-neutral-700 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-900"
+            >
+              Edit filters
+            </button>
+          </div>
+        </div>
+        {showFilters && (
+          <FilterDrawer
+            filters={filters}
+            onApply={(f) => {
+              setFilters(f);
+              setShowFilters(false);
+            }}
+            onClose={() => setShowFilters(false)}
+            client={client}
+          />
+        )}
+      </div>
+    );
+  }
+
   if (!loading && !current && queue.length === 0) {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
@@ -409,7 +460,7 @@ export function DeckView() {
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
-        {current && (
+        {current ? (
           <DeckCard
             key={current.id}
             item={current}
@@ -424,15 +475,10 @@ export function DeckView() {
             exitDirection={exitDirection}
             entering={entering}
           />
-        )}
+        ) : loading ? (
+          <DeckCardSkeleton />
+        ) : null}
       </div>
-
-      {loading && (
-        <div className="mt-8 flex items-center gap-2 text-sm text-neutral-600">
-          <div className="h-1.5 w-1.5 animate-ping rounded-full bg-red-500" />
-          Loading deck...
-        </div>
-      )}
 
       <ActionToast toast={toast} onDismiss={() => setToast(null)} />
 

@@ -20,10 +20,12 @@ export default function ReviewLaterPage() {
   const [items, setItems] = useState<PendingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setError('');
     client
       .getPendingReviews()
       .then((data) => {
@@ -38,7 +40,7 @@ export default function ReviewLaterPage() {
     return () => {
       cancelled = true;
     };
-  }, [client]);
+  }, [client, reloadKey]);
 
   return (
     <div className="p-4">
@@ -49,14 +51,27 @@ export default function ReviewLaterPage() {
       <p className="mb-4 text-sm text-neutral-500">Titles you flagged to write about</p>
 
       {loading ? (
-        <p className="text-sm text-neutral-600">Loading...</p>
+        <div className="space-y-3">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-24 animate-pulse rounded-xl bg-neutral-900" />
+          ))}
+        </div>
       ) : error ? (
-        <p className="text-sm text-red-400">{error}</p>
+        <div className="rounded-xl border border-neutral-800 bg-neutral-950/50 p-8 text-center">
+          <p className="text-sm text-red-400">{error}</p>
+          <button
+            type="button"
+            onClick={() => setReloadKey((k) => k + 1)}
+            className="mt-4 rounded-lg border border-neutral-700 px-4 py-2 text-sm text-neutral-300 hover:bg-neutral-900"
+          >
+            Retry
+          </button>
+        </div>
       ) : items.length === 0 ? (
         <div className="rounded-xl border border-neutral-800 bg-neutral-950/50 p-8 text-center">
           <p className="text-neutral-400">Nothing queued for review.</p>
           <p className="mt-1 text-sm text-neutral-600">
-            On the deck, press ↑ or choose Review Later.
+            On the deck, press ↓ or choose Review Later.
           </p>
           <Link
             href="/deck"

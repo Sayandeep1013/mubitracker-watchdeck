@@ -10,17 +10,24 @@ Read after [`CONTEXT.md`](CONTEXT.md). Then work [`IMPLEMENTATION-PLAN.md`](IMPL
 ```
 Read docs/CONTEXT.md, docs/HANDOFF.md, and docs/IMPLEMENTATION-PLAN.md.
 
-Stages 0-1, Stage 2.1-2.7, and Stage 3.1-3.7 are all done. Stage 2 is the
-entire deck-engine v2 rewrite (cooldown/exclusion, taste model, corpus
-ingestion, bucket service, background pre-build, both clients wired) —
-it ships behind `DECK_ENGINE=v2`, which is NOT set in Vercel, so
-production is still v1, unaffected, byte-for-byte the same behavior it
-had before this session. Stage 3.1-3.7 is the mobile UX feedback layer
-(theme tokens, deck animations/gestures/fallback buttons, toast,
-safe areas/keyboard, accessibility, per-screen loading/empty/error
-states) — code-complete and typecheck-clean, but this session never had
-an Android device connected, so **none of it has been visually or
-interactively confirmed**. Treat it as a strong risk area, not "done."
+Stages 0-1, all of Stage 2 (2.1-2.7), and all of Stage 3 (3.1-3.8) are
+done. Stage 2 is the entire deck-engine v2 rewrite (cooldown/exclusion,
+taste model, corpus ingestion, bucket service, background pre-build,
+both clients wired) — it ships behind `DECK_ENGINE=v2`, which is NOT set
+in Vercel, so production is still v1, unaffected, byte-for-byte the same
+behavior it had before this session. Stage 3 is the UX feedback layer on
+both clients (theme tokens, deck animations/gestures/fallback buttons,
+toast, safe areas/keyboard, accessibility, per-screen loading/empty/error
+states, plus web-side polish: deck skeleton+retry, review editor title,
+self-hosted TMDB logo, import error messages, and a real bug fix — web's
+`review_later` was animating the card upward instead of downward).
+
+Web's Stage 3.8 work was verified in a real headless Playwright browser
+(see Session Log for exact checks) — trust it. **Mobile's Stage 3.1-3.7
+was NOT** — no Android device was connected this session, so it's
+typecheck-clean and code-reviewed by hand only, left at `[~]` in the
+plan. Treat it as a real risk area, not "done," until it's actually run
+on a device.
 
 Two things are explicitly waiting on the user, not on you:
 1. **Stage 2.8** (flip `DECK_ENGINE=v2` in Vercel) — user-visible
@@ -34,19 +41,16 @@ Two things are explicitly waiting on the user, not on you:
    cover Stage 3's new UI) — write them if you have device access, or do
    a manual pass and note in the Session Log exactly what you checked.
 
-Continue with **3.8: web polish** (spec 32) — deck skeleton + retry,
-review editor shows the title, invalid Tailwind classes
-(`text-neutral-00` / `text-neutral-????00` in
-apps/web/src/app/profile/page.tsx / about page), self-host the broken
-TMDB logo, review-later empty state names the wrong key, import error
-messages, lowercase chips. This is web-side, so verify it the way 2.7
-was verified: a real headless Playwright browser session, not just
-typecheck.
-
-After 3.8, Stage 3 is fully shipped (mobile portion still `[~]` pending
-device). Move to Stage 4 (friends/filters/Watch Later parity on mobile) —
-independent of 2.8, can start regardless of whether the flag has been
-flipped yet.
+Continue with **Stage 4** (friends/filters/Watch Later parity on
+mobile, spec 40) — independent of 2.8, can start regardless of whether
+the flag has been flipped yet. Note that spec 32 §4 (a new `/reviews`
+list screen with Written/Pending tabs) and §6 (mobile-web bottom-nav
+`More` sheet) and §8 (privacy settings UI, already Stage 4.1) were
+scoped INTO spec 32 but are NOT covered by IMPLEMENTATION-PLAN.md's
+Stage 3.8 line or by this session's work — they're a gap between the
+spec and the plan, not something silently skipped. Flag this to the
+user once, then either fold them into Stage 4 or add a Stage 3.9 if
+they want it tracked explicitly.
 
 For each item: implement → pnpm typecheck → write/extend its test →
 verify against the acceptance criterion → commit → update the checkbox
@@ -63,7 +67,7 @@ When you finish a stage, update this prompt block and tell me what
 changed.
 ```
 
-**Current position: Stage 1, all of Stage 2 (2.1-2.7), and Stage 3.1-3.7 shipped (`2026-08-13`). Deck v2 is behind `DECK_ENGINE=v2` (unset in prod — v1 still serves production unchanged); Stage 2.8 needs the user's go-ahead before flipping the flag. Stage 3.1-3.7 is code-complete/typecheck-clean but `[~]` — no Android device this session, so it's unverified on-device. Next up: Stage 3.8 (web polish), verifiable now via headless Playwright.**
+**Current position: Stage 1, all of Stage 2 (2.1-2.7), and all of Stage 3 (3.1-3.8) shipped (`2026-08-13`). Deck v2 is behind `DECK_ENGINE=v2` (unset in prod — v1 still serves production unchanged); Stage 2.8 needs the user's go-ahead before flipping the flag. Stage 3.8 (web) is `[x]`, verified in a real headless browser. Stage 3.1-3.7 (mobile) is `[~]` — code-complete/typecheck-clean but no Android device this session, so it's unverified on-device. Next up: Stage 4 (friends/filters/Watch Later parity on mobile) — see the gap note above about spec 32 §4/§6 first.**
 
 ### Pending verification
 
@@ -105,6 +109,23 @@ This is the mechanism that lets a session run without the user in the loop. Foll
 ## Session Log
 
 Newest first. One line per completed item; a block per stage.
+
+### 2026-08-13 — Stage 3.8 (web polish)
+
+Spec [`32`](spec/32-web-ux.md), scoped to the items named in `IMPLEMENTATION-PLAN.md`'s 3.8 line — not the full spec (see the gap note in the ▶ Next session block about §4/§6, which aren't tracked anywhere yet).
+
+| Item | Change |
+|---|---|
+| Deck skeleton + retry | New `DeckCardSkeleton` (exported from `DeckCard.tsx`) — same dimensions as the real card so nothing shifts when content arrives — renders during the initial/filter-change load instead of a tiny "Loading deck..." dot. Added a distinct `loadError` state (separate from the legitimate "Deck is empty" state) with a **Couldn't load the deck** message, **Retry** (re-runs `fetchBatch`), and **Edit filters**; only the initial/filter-change fetch (identified by `fetchBatch` being called with `overrides`) sets it — a background prefetch failure still just toasts, per spec §7's "prefetch: silent, retried on next advance." |
+| **Real bug found and fixed while touching this code, not in the original 3.8 scope list:** `review_later` exit direction | `DeckView.tsx`'s `performAction` mapped both `watch_later` and `review_later` to exit direction `'up'` — spec 32 §2.1's own explicitly-flagged defect and acceptance criterion #1. Added `deck-exit-down`/`.animate-deck-exit-down` to `globals.css`, extended `exitDirection`'s type to include `'down'` in both `DeckView.tsx` and `DeckCard.tsx`, and mapped `review_later → 'down'`. Verified live: pressing ↓ now shows the purple bookmark cue and animates the card downward, matching ↑/Watch Later's upward animation. |
+| Review editor shows the title | `review-later/[id]/page.tsx` now fetches the media record via `client.getMedia()` on mount (skipped if the route id already failed uuid validation) and renders poster + title + year + type above the textarea, with a skeleton while fetching and "Title unavailable" on failure — mirrors mobile's `review/[id].tsx` pattern from Stage 3.4. |
+| `text-neutral-00` / `text-neutral-????00` | Both were literal invalid Tailwind classes in `profile/page.tsx` (Watched stat label, About link) that silently rendered as unstyled/default text color. Fixed to `text-neutral-500` / `text-neutral-300` respectively, matching sibling elements. |
+| Self-host TMDB logo | `about/page.tsx` loaded TMDB's logo from `themoviedb.org` directly, which the audit found `ERR_BLOCKED_BY_ORB` in a real browser. The specific asset URL the audit recorded was also just stale — TMDB fingerprints its asset filenames per deploy and the hash had rotated. Fetched the *current* URL from TMDB's live homepage HTML and saved it to `apps/web/public/tmdb.svg` (2065 bytes, verified valid SVG matching TMDB's official "short" logo mark); `about/page.tsx` now points at the local path. Verified in a real browser: `naturalWidth` 300 (loaded successfully), zero console/network errors. |
+| Review-later empty state names the wrong key | `review-later/page.tsx` said "press ↑ or choose Review Later" — spec 32 §9.4 / the canonical gesture map (§2.1) say ↓. Fixed the string; also added a 3-row skeleton for the loading state and a Retry button for the error state (both already implied by spec §7's loading/error table for this screen, previously missing entirely — it just showed unstyled "Loading..."/error text with no recovery path). |
+| Import error messages | `profile/page.tsx`'s `importData()` had one `catch` covering both `JSON.parse` failure and the server request failure, both reported as `alert('Invalid JSON')` — a well-formed-but-server-rejected payload got the same wrong message as genuinely malformed text. Split into two `try/catch` blocks: parse failure → *That's not valid JSON*, request failure → the actual server message. Replaced both `alert()` calls (success and both failure paths) with the existing `ActionToast` component, reused here for the first time outside `DeckView.tsx` since it's already a fully reusable, non-deck-specific presentational component. Also added a `.catch()` to `exportData()`, which had none. |
+| Lowercase status chips | Spec 32 §9.6 claimed `collection/page.tsx`'s status filter chips render lowercase (`watched`/`unwatched`) beside `All`. Checked the current code: they're already capitalized via `s.charAt(0).toUpperCase() + s.slice(1)` — this one was already fixed at some earlier point (likely Stage 0.3's pagination work touched the same area) and the spec's fix-list entry is stale. No change needed; confirmed by reading, not assumed. |
+
+**Verified in a real headless Playwright browser** (fresh signup against the local dev server, same technique as Stage 2.7): deck skeleton visible on initial nav; pressing ↓ produces exactly one `.animate-deck-exit-down` element and the correct `Queued for review · {title}` toast; `/about`'s TMDB `<img>` loads with `naturalWidth` 300 and zero console errors; `/profile`'s Watched-stat and About-link classes read `text-neutral-500`/`text-neutral-300`; pasting malformed JSON shows *That's not valid JSON* while a syntactically-valid-but-schema-rejected payload shows the actual Zod error array from the server (confirmed these are genuinely different messages, not the same string twice — my first test run showed them matching only because the test itself clicked Import before the prior toast had cleared, not because of an app bug); a fresh account's `/review-later` empty state reads "press ↓ or choose Review Later"; opening a queued title's review editor renders its real poster and title above the textarea.
 
 ### 2026-08-13 — Stage 3.1-3.7 (mobile UX feedback layer)
 

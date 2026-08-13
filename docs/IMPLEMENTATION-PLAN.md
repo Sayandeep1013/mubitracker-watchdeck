@@ -134,7 +134,8 @@ Specs [`31`](spec/31-mobile-design-system.md) (mobile) · [`32`](spec/32-web-ux.
 - [~] **3.5 Accessibility** — mobile has **zero** `accessibilityLabel`/`accessibilityRole`; actions are gesture-only. Add the fallback button row and 48dp targets.
 - [~] **3.6 Unify gesture map** — ↑ = Watch Later on both. Mobile maps ↑ to Review Later and has no ↓.
 - [~] **3.7 Loading / empty / error states** on every mobile screen.
-- [ ] **3.8 Web polish** — deck skeleton + retry, review editor shows the title, `text-neutral-00` / `text-neutral-????00` invalid classes, self-host the broken TMDB logo, review-later empty state names the wrong key, import error messages, lowercase chips.
+- [x] **3.8 Web polish** — deck skeleton + retry, review editor shows the title, `text-neutral-00` / `text-neutral-????00` invalid classes, self-host the broken TMDB logo, review-later empty state names the wrong key, import error messages, lowercase chips.
+  > Also fixed a spec-32 §2.1 defect found while touching this code: `review_later` animated the card **upward** (same direction as `watch_later`) instead of downward. Verified in a real headless browser — see Session Log.
 
 ---
 

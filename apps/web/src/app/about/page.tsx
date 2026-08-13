@@ -16,13 +16,7 @@ export default function AboutPage() {
       <section className="rounded-xl border border-zinc-800 p-4">
         <h2 className="mb-3 text-sm font-semibold uppercase text-zinc-500">Data Attribution</h2>
         <div className="mb-4 flex items-center gap-4">
-          <Image
-            src="https://www.themoviedb.org/assets/2/v4/logos/v2/blue_short-8e7b30f73a4020692ccca99c578bcf14f94801e9.svg"
-            alt="TMDB"
-            width={120}
-            height={40}
-            unoptimized
-          />
+          <Image src="/tmdb.svg" alt="TMDB" width={120} height={16} />
         </div>
         <p className="text-sm text-zinc-400">
           This product uses the TMDB API but is not endorsed or certified by TMDB.

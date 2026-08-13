@@ -16,7 +16,7 @@ interface DeckCardProps {
   onConfirm: () => void;
   dragX?: number;
   dragY?: number;
-  exitDirection?: 'left' | 'right' | 'up' | null;
+  exitDirection?: 'left' | 'right' | 'up' | 'down' | null;
   entering?: boolean;
 }
 
@@ -56,7 +56,9 @@ export function DeckCard({
         ? 'animate-deck-exit-right'
         : exitDirection === 'up'
           ? 'animate-deck-exit-up'
-          : '';
+          : exitDirection === 'down'
+            ? 'animate-deck-exit-down'
+            : '';
 
   return (
     <div
@@ -189,6 +191,30 @@ export function DeckCard({
         <span>↓ Review Later</span>
         <span>Watched →</span>
         <span>Enter ↵</span>
+      </div>
+    </div>
+  );
+}
+
+/** Mirrors DeckCard's exact dimensions so real content never shifts layout on arrival. */
+export function DeckCardSkeleton() {
+  return (
+    <div className="flex w-full max-w-md flex-col items-center gap-4 animate-pulse">
+      <div className="aspect-[2/3] w-56 rounded-xl bg-neutral-900 sm:w-64" />
+      <div className="flex flex-col items-center gap-2">
+        <div className="h-6 w-40 rounded bg-neutral-900" />
+        <div className="h-3 w-24 rounded bg-neutral-900" />
+      </div>
+      <div className="flex w-full max-w-md flex-col gap-2">
+        <div className="flex gap-2">
+          <div className="h-11 flex-1 rounded-lg bg-neutral-900" />
+          <div className="h-11 flex-1 rounded-lg bg-neutral-900" />
+        </div>
+        <div className="flex gap-2">
+          <div className="h-11 flex-1 rounded-lg bg-neutral-900" />
+          <div className="h-11 flex-1 rounded-lg bg-neutral-900" />
+        </div>
+        <div className="mt-1 h-11 w-full rounded-lg bg-neutral-900" />
       </div>
     </div>
   );

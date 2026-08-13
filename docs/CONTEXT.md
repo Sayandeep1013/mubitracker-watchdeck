@@ -90,6 +90,16 @@ Username + password only. Under the hood, Supabase Auth with a **synthetic email
 - Search actions (`search.tsx`) now emit an error toast on a failed classify, in addition to the existing await + inline saved/failed/retry row state.
 - `GET /api/v1/profile` (shared by both clients) gained `unwatchedCount`/`watchLaterCount` alongside the existing `watchedCount`/`reviewCount`/`friendsCount`; mobile Profile now shows all four counts spec 31 requires (watched/haven't/watch later/reviews) instead of three.
 
+*Added in Stage 3.8 (`2026-08-13`) — web polish, spec [`32`](spec/32-web-ux.md), verified in a real headless browser:*
+- Fixed a real defect found while implementing this stage, not by inspection alone: `DeckView.tsx`'s `review_later` action animated the card **upward** (same direction as `watch_later`), instead of downward per spec 32 §2.1's canonical contract. Now correctly exits down with the purple bookmark cue.
+- Deck shows a full-size skeleton (not a blank/tiny spinner) during the initial or filter-change load, and a distinct "Couldn't load the deck" + Retry + Edit filters state on genuine fetch failure (previously indistinguishable from the legitimate "Deck is empty" state).
+- `apps/web/public/tmdb.svg` — the TMDB logo is now self-hosted (the audit's recorded URL had also gone stale; TMDB fingerprints asset filenames per deploy). `/about` no longer hits `ERR_BLOCKED_BY_ORB`.
+- `profile/page.tsx`: fixed two literal-invalid Tailwind classes (`text-neutral-00`, `text-neutral-????00`); import now distinguishes malformed JSON from a valid-but-server-rejected payload and shows both via a reused `ActionToast` instead of `alert()`.
+- `review-later/[id]/page.tsx` now shows the title/poster of the media being reviewed; `review-later/page.tsx`'s empty state correctly says "press ↓" (was ↑).
+- Collection's status chips were already correctly capitalized (`All / Watched / Unwatched`) — the audit's fix-list entry for this was stale; confirmed by reading the code, not re-fixed.
+
+**Known gap, not yet resolved:** spec 32 §4 (a `/reviews` list screen with Written/Pending tabs, editing, deleting) and §6 (mobile-web bottom-nav `More` sheet for Friends/Profile/Notifications) are both explicitly in spec 32's scope but appear in neither `IMPLEMENTATION-PLAN.md`'s Stage 3.8 line nor anywhere in Stage 4 — they were never actually assigned a plan item. Needs a decision: fold into Stage 4, or add as a new plan item.
+
 *Fixed in Stage 1 (`2026-08-13`):*
 - ~~Series genre coverage 46%~~ — TV genre ids seeded, per-row genre-link inserts (one bad FK no longer drops a title's whole genre set), 236 genre-less rows backfilled from TMDB. **99.6% series / 99.7% movie coverage**, verified live.
 - ~~`media` duplicate rows on concurrent upsert~~ — `upsertMedia` now claims the `media_external_ids` link with `on conflict do nothing`; the loser of a race discards its orphan insert and refreshes the winner's metadata instead. Verified 0 duplicate `(provider, external_id)` pairs and 0 orphaned `media` rows under a live test run.
