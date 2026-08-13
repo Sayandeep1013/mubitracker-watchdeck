@@ -7,6 +7,9 @@ import { useApiClient, useSupabase } from '@/hooks/useApiClient';
 import { ActionToast, type ToastState } from '@/components/ActionToast';
 import type { Profile } from '@mubitracker/shared';
 
+type PrivacyField = 'profileVisibility' | 'collectionVisibility' | 'reviewsVisibility';
+type PrivacyValue = 'public' | 'friends' | 'private';
+
 export default function ProfilePage() {
   const client = useApiClient();
   const supabase = useSupabase();
@@ -14,6 +17,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [importJson, setImportJson] = useState('');
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [copied, setCopied] = useState(false);
   const toastId = useRef(0);
 
   useEffect(() => {
@@ -61,6 +65,32 @@ export default function ProfilePage() {
     }
   };
 
+  const setPrivacyField = async (field: PrivacyField, value: PrivacyValue) => {
+    if (!profile) return;
+    const previous = profile[field];
+    if (previous === value) return;
+    setProfile({ ...profile, [field]: value });
+    try {
+      if (field === 'profileVisibility') await client.updateProfile({ profile_visibility: value });
+      else if (field === 'collectionVisibility') await client.updateProfile({ collection_visibility: value });
+      else await client.updateProfile({ reviews_visibility: value });
+    } catch (e) {
+      setProfile((p) => (p ? { ...p, [field]: previous } : p));
+      showToast({ message: e instanceof Error ? e.message : 'Failed to save', tone: 'error' });
+    }
+  };
+
+  const copyHandle = async () => {
+    if (!profile) return;
+    try {
+      await navigator.clipboard.writeText(profile.username);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      showToast({ message: 'Could not copy — try selecting the text manually', tone: 'error' });
+    }
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
     router.push('/login');
@@ -79,6 +109,78 @@ export default function ProfilePage() {
     <div className="mx-auto max-w-lg p-4">
       <h1 className="mb-2 text-2xl font-bold text-white">Profile</h1>
       <p className="mb-6 text-neutral-500">@{profile.username}</p>
+
+      <div className="mb-6 rounded-lg border border-neutral-800 bg-neutral-900/50 p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-white">Privacy</h2>
+          <button
+            type="button"
+            onClick={copyHandle}
+            className="rounded border border-neutral-800 px-2 py-1 text-xs text-neutral-300 hover:border-neutral-700"
+          >
+            {copied ? 'Copied!' : `Copy handle @${profile.username}`}
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-300" htmlFor="profile-visibility">
+              Profile visibility
+            </label>
+            <select
+              id="profile-visibility"
+              value={profile.profileVisibility === 'private' ? 'private' : 'public'}
+              onChange={(e) => setPrivacyField('profileVisibility', e.target.value as 'public' | 'private')}
+              className="w-full rounded border border-neutral-800 bg-neutral-950 p-2 text-sm text-white"
+            >
+              <option value="private">Private</option>
+              <option value="public">Public</option>
+            </select>
+            <p className="mt-1 text-xs text-neutral-500">
+              Public lets people find you by typing part of your username. Anyone who knows your
+              exact handle can always send a request.
+            </p>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-300" htmlFor="collection-visibility">
+              Collection visibility
+            </label>
+            <select
+              id="collection-visibility"
+              value={profile.collectionVisibility}
+              onChange={(e) =>
+                setPrivacyField('collectionVisibility', e.target.value as 'public' | 'friends' | 'private')
+              }
+              className="w-full rounded border border-neutral-800 bg-neutral-950 p-2 text-sm text-white"
+            >
+              <option value="public">Public</option>
+              <option value="friends">Friends</option>
+              <option value="private">Private</option>
+            </select>
+            <p className="mt-1 text-xs text-neutral-500">Who can see what you&apos;ve watched.</p>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-300" htmlFor="reviews-visibility">
+              Reviews visibility
+            </label>
+            <select
+              id="reviews-visibility"
+              value={profile.reviewsVisibility}
+              onChange={(e) =>
+                setPrivacyField('reviewsVisibility', e.target.value as 'public' | 'friends' | 'private')
+              }
+              className="w-full rounded border border-neutral-800 bg-neutral-950 p-2 text-sm text-white"
+            >
+              <option value="public">Public</option>
+              <option value="friends">Friends</option>
+              <option value="private">Private</option>
+            </select>
+            <p className="mt-1 text-xs text-neutral-500">Who can read your reviews.</p>
+          </div>
+        </div>
+      </div>
 
       <div className="mb-6 grid grid-cols-3 gap-3 text-center">
         <div className="rounded-lg border border-neutral-800/50 bg-neutral-900/30 p-3">

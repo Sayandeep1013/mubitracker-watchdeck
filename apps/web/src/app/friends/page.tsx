@@ -23,6 +23,9 @@ export default function FriendsPage() {
   const [outgoing, setOutgoing] = useState<Friendship[]>([]);
   const [blocked, setBlocked] = useState<Friendship[]>([]);
   const [myId, setMyId] = useState<string | null>(null);
+  const [myUsername, setMyUsername] = useState<string | null>(null);
+  const [showNudge, setShowNudge] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [username, setUsername] = useState('');
   const [searchQ, setSearchQ] = useState('');
   const [searchHits, setSearchHits] = useState<{ id: string; username: string }[]>([]);
@@ -50,9 +53,40 @@ export default function FriendsPage() {
     load().catch(() => setError('Failed to load friends'));
     client
       .getProfile()
-      .then((p) => setMyId(p.id))
+      .then((p) => {
+        setMyId(p.id);
+        setMyUsername(p.username);
+        const dismissed = window.localStorage.getItem(`mubitracker:discoverable-nudge-dismissed:${p.id}`);
+        if (p.profileVisibility === 'private' && !dismissed) setShowNudge(true);
+      })
       .catch(() => {});
   }, [load, client]);
+
+  const dismissNudge = (persist: boolean) => {
+    setShowNudge(false);
+    if (persist && myId) {
+      window.localStorage.setItem(`mubitracker:discoverable-nudge-dismissed:${myId}`, '1');
+    }
+  };
+
+  const makeDiscoverable = async () => {
+    try {
+      await client.updateProfile({ profile_visibility: 'public' });
+    } finally {
+      dismissNudge(true);
+    }
+  };
+
+  const copyHandle = async () => {
+    if (!myUsername) return;
+    try {
+      await navigator.clipboard.writeText(myUsername);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setError('Could not copy — try selecting the text manually');
+    }
+  };
 
   useEffect(() => {
     if (searchQ.trim().length < 2) {
@@ -96,7 +130,40 @@ export default function FriendsPage() {
 
   return (
     <div className="mx-auto max-w-2xl p-4">
-      <h1 className="mb-4 text-2xl font-bold text-white">Friends</h1>
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-white">Friends</h1>
+        {myUsername && (
+          <button
+            type="button"
+            onClick={copyHandle}
+            className="rounded border border-neutral-800 px-2 py-1 text-xs text-neutral-400 hover:border-neutral-700"
+          >
+            {copied ? 'Copied!' : `Copy handle @${myUsername}`}
+          </button>
+        )}
+      </div>
+
+      {showNudge && (
+        <div className="mb-4 flex items-center justify-between rounded-xl border border-red-900/40 bg-red-500/5 px-3 py-3">
+          <p className="text-sm text-neutral-300">Let people find you by username?</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={makeDiscoverable}
+              className="rounded bg-red-600 px-3 py-1.5 text-xs font-medium text-white"
+            >
+              Make me discoverable
+            </button>
+            <button
+              type="button"
+              onClick={() => dismissNudge(true)}
+              className="rounded border border-neutral-700 px-3 py-1.5 text-xs text-neutral-400"
+            >
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="mb-4 space-y-2 rounded-xl border border-neutral-800 p-3">
         <p className="text-xs uppercase text-neutral-500">Add by username</p>
