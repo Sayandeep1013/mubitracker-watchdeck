@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 import {
   IconBookmark,
   IconClock,
@@ -13,6 +14,9 @@ import {
   IconUsers,
 } from './icons';
 import { NotificationBell } from './NotificationBell';
+import { MoreSheet, MoreTrigger } from './MoreSheet';
+import { ActionToast } from './ActionToast';
+import { useNotificationsFeed } from '@/hooks/useNotificationsFeed';
 
 const links = [
   { href: '/deck', label: 'Deck', Icon: IconLayers },
@@ -24,8 +28,19 @@ const links = [
   { href: '/profile', label: 'Profile', Icon: IconUser },
 ];
 
+// Spec 32 §6: 5 items + More, not 7-item cramming. Slots 1-4 stay static;
+// Reviews (not Later) fills slot 4 — Watch Later moves into the sheet.
+const MOBILE_BAR = [links[0], links[1], links[2], links[4]];
+const MORE_SHEET_ROUTES = ['/watch-later', '/friends', '/profile', '/about'];
+
 export function Nav() {
   const pathname = usePathname();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const { unread, items, toast, dismissToast, markAll } = useNotificationsFeed();
+
+  const moreActive = MORE_SHEET_ROUTES.some(
+    (href) => pathname === href || pathname.startsWith(`${href}/`),
+  );
 
   return (
     <>
@@ -35,7 +50,7 @@ export function Nav() {
             <Image src="/logo.png" alt="" width={24} height={24} className="rounded-md" />
             <span className="text-sm font-bold tracking-tight text-neutral-200">MUBITRACKER</span>
           </Link>
-          <NotificationBell />
+          <NotificationBell unread={unread} items={items} onOpen={markAll} />
         </div>
         {links.map((link) => {
           const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
@@ -56,8 +71,10 @@ export function Nav() {
           );
         })}
       </nav>
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex border-t border-neutral-800/50 bg-neutral-950/95 backdrop-blur md:hidden">
-        {links.slice(0, 5).map((link) => {
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-50 flex border-t border-neutral-800/50 bg-neutral-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+      >
+        {MOBILE_BAR.map((link) => {
           const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
           const Icon = link.Icon;
           return (
@@ -73,7 +90,18 @@ export function Nav() {
             </Link>
           );
         })}
+        <MoreTrigger active={moreActive} unread={unread} onPress={() => setMoreOpen(true)} />
       </nav>
+
+      <MoreSheet
+        open={moreOpen}
+        onClose={() => setMoreOpen(false)}
+        unread={unread}
+        items={items}
+        onOpenNotifications={markAll}
+      />
+
+      <ActionToast toast={toast} onDismiss={dismissToast} />
     </>
   );
 }

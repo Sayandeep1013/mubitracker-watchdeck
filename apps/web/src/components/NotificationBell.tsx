@@ -1,71 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActionToast, type ToastState } from './ActionToast';
+import { useState } from 'react';
 import { IconBell } from './icons';
-import { useApiClient } from '@/hooks/useApiClient';
+import type { NotificationItem } from '@/hooks/useNotificationsFeed';
 
-export function NotificationBell() {
-  const client = useApiClient();
-  const [unread, setUnread] = useState(0);
+interface NotificationBellProps {
+  unread: number;
+  items: NotificationItem[];
+  onOpen: () => void;
+}
+
+export function NotificationBell({ unread, items, onOpen }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
-  const [items, setItems] = useState<
-    {
-      id: string;
-      type: string;
-      friendshipId: string | null;
-      actor: { username: string } | null;
-    }[]
-  >([]);
-  const [toast, setToast] = useState<ToastState | null>(null);
-  const seen = useRef<Set<string>>(new Set());
-  const toastId = useRef(0);
-
-  const refresh = useCallback(async () => {
-    try {
-      const data = await client.getNotifications();
-      setUnread(data.unreadCount);
-      setItems(data.items.slice(0, 12));
-
-      for (const n of data.items) {
-        if (n.readAt) continue;
-        if (seen.current.has(n.id)) continue;
-        seen.current.add(n.id);
-        if (n.type === 'friend_request' && n.actor) {
-          const id = ++toastId.current;
-          setToast({
-            id,
-            tone: 'neutral',
-            message: `Friend request from @${n.actor.username}`,
-            href: '/friends',
-            hrefLabel: 'Open Friends',
-          });
-          window.setTimeout(() => setToast((t) => (t?.id === id ? null : t)), 4000);
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }, [client]);
-
-  useEffect(() => {
-    refresh();
-    const id = window.setInterval(refresh, 30000);
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') refresh();
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => {
-      window.clearInterval(id);
-      document.removeEventListener('visibilitychange', onVisible);
-    };
-  }, [refresh]);
-
-  const markAll = async () => {
-    await client.markNotificationsRead({ all: true });
-    refresh();
-  };
 
   return (
     <div className="relative">
@@ -73,7 +20,7 @@ export function NotificationBell() {
         type="button"
         onClick={() => {
           setOpen((v) => !v);
-          if (!open) markAll();
+          if (!open) onOpen();
         }}
         className="relative rounded-lg border border-neutral-800 p-2 text-neutral-400 hover:border-red-500/30 hover:text-red-400"
         aria-label="Notifications"
@@ -109,8 +56,6 @@ export function NotificationBell() {
           )}
         </div>
       )}
-
-      <ActionToast toast={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 }
