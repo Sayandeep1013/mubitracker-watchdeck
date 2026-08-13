@@ -82,6 +82,7 @@ export default function RootLayout() {
                 <Stack.Screen name="friends/add" options={{ presentation: 'modal' }} />
                 <Stack.Screen name="friends/notifications" options={{ presentation: 'modal' }} />
                 <Stack.Screen name="friends/[id]" />
+                <Stack.Screen name="watch-later" />
               </Stack>
             </NotificationsProvider>
           ) : (

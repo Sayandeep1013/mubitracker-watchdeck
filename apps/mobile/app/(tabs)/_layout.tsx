@@ -12,6 +12,22 @@ function TabIcon(name: FeatherName) {
   );
 }
 
+function CollectionHeaderRight() {
+  const router = useRouter();
+
+  return (
+    <Pressable
+      onPress={() => router.push('/watch-later')}
+      hitSlop={8}
+      style={styles.headerBtn}
+      accessibilityRole="button"
+      accessibilityLabel="Watch Later"
+    >
+      <Feather name="clock" color={themeColor.warning} size={20} />
+    </Pressable>
+  );
+}
+
 function FriendsHeaderRight() {
   const router = useRouter();
   const { unreadCount } = useNotifications();
@@ -62,7 +78,11 @@ export default function TabLayout() {
       <Tabs.Screen name="search" options={{ title: 'Search', tabBarIcon: TabIcon('search') }} />
       <Tabs.Screen
         name="collection"
-        options={{ title: 'Collection', tabBarIcon: TabIcon('grid') }}
+        options={{
+          title: 'Collection',
+          tabBarIcon: TabIcon('grid'),
+          headerRight: CollectionHeaderRight,
+        }}
       />
       <Tabs.Screen
         name="review-later"
