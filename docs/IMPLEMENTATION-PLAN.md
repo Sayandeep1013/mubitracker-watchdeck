@@ -122,13 +122,18 @@ Spec [`20`](spec/20-deck-engine-v2.md). Requires Stage 1.
 
 Specs [`31`](spec/31-mobile-design-system.md) (mobile) · [`32`](spec/32-web-ux.md) (web). Independent of Stage 2 — can run in parallel.
 
-- [ ] **3.1 Mobile theme tokens** — new `apps/mobile/lib/theme.ts`; screens currently hardcode hex. Resolves accent drift (login uses `#dc2626`, web uses `#ef4444`).
-- [ ] **3.2 Deck drag feedback + exit/enter animations (mobile)** — no visual response today; card just springs back. Directional overlays: right/green/check, left/red/X, up/amber/clock, down/purple/bookmark.
-- [ ] **3.3 Toast component (mobile)** — none exists; web has one. Include Undo affordance.
-- [ ] **3.4 Safe areas + keyboard** — review modal renders under the status bar; login has no `KeyboardAvoidingView`.
-- [ ] **3.5 Accessibility** — mobile has **zero** `accessibilityLabel`/`accessibilityRole`; actions are gesture-only. Add the fallback button row and 48dp targets.
-- [ ] **3.6 Unify gesture map** — ↑ = Watch Later on both. Mobile maps ↑ to Review Later and has no ↓.
-- [ ] **3.7 Loading / empty / error states** on every mobile screen.
+> **Shipped 2026-08-13** (3.1–3.7). All seven items are code-complete and
+> `pnpm typecheck` clean, but this session had no Android device or emulator
+> connected — none of it has been visually or interactively confirmed. Left
+> at `[~]` per the status legend; see *Pending verification* in `HANDOFF.md`.
+
+- [~] **3.1 Mobile theme tokens** — new `apps/mobile/lib/theme.ts`; screens currently hardcode hex. Resolves accent drift (login uses `#dc2626`, web uses `#ef4444`).
+- [~] **3.2 Deck drag feedback + exit/enter animations (mobile)** — no visual response today; card just springs back. Directional overlays: right/green/check, left/red/X, up/amber/clock, down/purple/bookmark.
+- [~] **3.3 Toast component (mobile)** — none exists; web has one. Include Undo affordance.
+- [~] **3.4 Safe areas + keyboard** — review modal renders under the status bar; login has no `KeyboardAvoidingView`.
+- [~] **3.5 Accessibility** — mobile has **zero** `accessibilityLabel`/`accessibilityRole`; actions are gesture-only. Add the fallback button row and 48dp targets.
+- [~] **3.6 Unify gesture map** — ↑ = Watch Later on both. Mobile maps ↑ to Review Later and has no ↓.
+- [~] **3.7 Loading / empty / error states** on every mobile screen.
 - [ ] **3.8 Web polish** — deck skeleton + retry, review editor shows the title, `text-neutral-00` / `text-neutral-????00` invalid classes, self-host the broken TMDB logo, review-later empty state names the wrong key, import error messages, lowercase chips.
 
 ---

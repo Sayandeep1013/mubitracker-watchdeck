@@ -13,6 +13,8 @@ import * as Haptics from 'expo-haptics';
 import type { MediaSummary, WatchStatus } from '@mubitracker/shared';
 import { tmdbPosterUrl } from '@mubitracker/shared';
 import { apiClient } from '@/lib/api';
+import { useToast } from '@/components/Toast';
+import { color, radius, space, type } from '@/lib/theme';
 
 type MarkState = Record<string, WatchStatus | 'pending' | 'failed'>;
 
@@ -23,6 +25,7 @@ export default function SearchScreen() {
   const [error, setError] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
   const [marks, setMarks] = useState<MarkState>({});
+  const showToast = useToast();
 
   const search = async () => {
     if (!query.trim() || searching) return;
@@ -41,7 +44,7 @@ export default function SearchScreen() {
 
   // Previously fire-and-forget: no await, no state change, no catch. The write
   // persisted but was invisible, and a failure was silent too.
-  const mark = async (id: string, status: WatchStatus) => {
+  const mark = async (id: string, status: WatchStatus, title: string) => {
     if (marks[id] === 'pending') return;
     setMarks((m) => ({ ...m, [id]: 'pending' }));
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -50,6 +53,7 @@ export default function SearchScreen() {
       setMarks((m) => ({ ...m, [id]: status }));
     } catch {
       setMarks((m) => ({ ...m, [id]: 'failed' }));
+      showToast({ message: `Couldn't save ${title} — try again`, tone: 'error' });
     }
   };
 
@@ -60,7 +64,7 @@ export default function SearchScreen() {
           value={query}
           onChangeText={setQuery}
           placeholder="Search…"
-          placeholderTextColor="#71717a"
+          placeholderTextColor={color.textMuted}
           style={styles.input}
           onSubmitEditing={search}
           returnKeyType="search"
@@ -73,11 +77,14 @@ export default function SearchScreen() {
           accessibilityRole="button"
           accessibilityLabel="Search"
         >
-          {searching ? <ActivityIndicator color="#09090b" /> : <Text style={styles.btnText}>Go</Text>}
+          {searching ? <ActivityIndicator color={color.bg} /> : <Text style={styles.btnText}>Go</Text>}
         </Pressable>
       </View>
 
       {error && <Text style={styles.error}>{error}</Text>}
+      {!searched && !searching && !error && (
+        <Text style={styles.muted}>Search for a film or series</Text>
+      )}
       {searched && !error && results.length === 0 && !searching && (
         <Text style={styles.muted}>No results for “{query.trim()}”.</Text>
       )}
@@ -108,13 +115,19 @@ export default function SearchScreen() {
                     ✓ Saved as {mark_ === 'watched' ? 'Watched' : "Haven't watched"}
                   </Text>
                 ) : mark_ === 'failed' ? (
-                  <Pressable onPress={() => mark(item.id, 'watched')} hitSlop={8}>
+                  <Pressable
+                    onPress={() => mark(item.id, 'watched', item.title)}
+                    hitSlop={8}
+                    style={styles.actionHit}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Retry saving ${item.title}`}
+                  >
                     <Text style={styles.failed}>Couldn&apos;t save — tap to retry</Text>
                   </Pressable>
                 ) : (
                   <View style={styles.actions}>
                     <Pressable
-                      onPress={() => mark(item.id, 'watched')}
+                      onPress={() => mark(item.id, 'watched', item.title)}
                       disabled={mark_ === 'pending'}
                       hitSlop={8}
                       style={styles.actionHit}
@@ -126,7 +139,7 @@ export default function SearchScreen() {
                       </Text>
                     </Pressable>
                     <Pressable
-                      onPress={() => mark(item.id, 'unwatched')}
+                      onPress={() => mark(item.id, 'unwatched', item.title)}
                       disabled={mark_ === 'pending'}
                       hitSlop={8}
                       style={styles.actionHit}
@@ -147,36 +160,36 @@ export default function SearchScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#09090b', padding: 16 },
-  row: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  input: { flex: 1, backgroundColor: '#18181b', borderRadius: 8, padding: 12, color: '#fafafa' },
+  container: { flex: 1, backgroundColor: color.bg, padding: space.lg },
+  row: { flexDirection: 'row', gap: space.sm, marginBottom: space.lg },
+  input: { flex: 1, backgroundColor: color.surface, borderRadius: radius.sm, padding: space.md, color: color.text },
   btn: {
-    backgroundColor: '#fafafa',
-    borderRadius: 8,
-    paddingHorizontal: 20,
+    backgroundColor: color.text,
+    borderRadius: radius.sm,
+    paddingHorizontal: space.xl,
     minHeight: 48,
     justifyContent: 'center',
   },
   pressed: { opacity: 0.6 },
-  btnText: { color: '#09090b', fontWeight: '600' },
-  error: { color: '#f87171', marginBottom: 12 },
-  muted: { color: '#71717a', marginBottom: 12 },
+  btnText: { color: color.bg, fontWeight: '600' },
+  error: { color: color.danger, marginBottom: space.md },
+  muted: { color: color.textMuted, marginBottom: space.md },
   item: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
-    padding: 8,
-    backgroundColor: '#18181b',
-    borderRadius: 8,
+    gap: space.md,
+    marginBottom: space.md,
+    padding: space.sm,
+    backgroundColor: color.surface,
+    borderRadius: radius.sm,
   },
-  thumb: { width: 48, height: 72, borderRadius: 4 },
-  thumbPlaceholder: { backgroundColor: '#27272a' },
+  thumb: { width: 48, height: 72, borderRadius: radius.sm / 2 },
+  thumbPlaceholder: { backgroundColor: color.surfaceHigh },
   itemBody: { flex: 1 },
-  itemTitle: { color: '#fafafa', fontWeight: '600' },
-  itemMeta: { color: '#71717a', fontSize: 12, marginTop: 2 },
-  actions: { flexDirection: 'row', gap: 16, marginTop: 8 },
-  actionHit: { minHeight: 44, justifyContent: 'center' },
-  action: { color: '#a1a1aa', fontSize: 13, fontWeight: '600' },
-  marked: { color: '#4ade80', fontSize: 12, marginTop: 8 },
-  failed: { color: '#f87171', fontSize: 12, marginTop: 8 },
+  itemTitle: { color: color.text, fontWeight: '600' },
+  itemMeta: { color: color.textMuted, fontSize: type.caption.fontSize, marginTop: 2 },
+  actions: { flexDirection: 'row', gap: space.lg, marginTop: space.sm },
+  actionHit: { minHeight: 48, justifyContent: 'center' },
+  action: { color: color.textMuted, fontSize: 13, fontWeight: '600' },
+  marked: { color: color.success, fontSize: type.caption.fontSize, marginTop: space.sm },
+  failed: { color: color.danger, fontSize: type.caption.fontSize, marginTop: space.sm },
 });

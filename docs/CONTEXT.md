@@ -60,7 +60,7 @@ Username + password only. Under the hood, Supabase Auth with a **synthetic email
 - The deck engine can only reach **~400 titles** per session; a heavy account (283 tracked) has effectively exhausted it.
 - Deck serving is still **taste-blind** in production — v1 (`generate.ts`) never calls `getTaste`/`deriveQuotas`. A user who rejects 90% of live-action series still gets served them at the same rate as before.
 - One under-filled batch **permanently kills** the deck (null cursor → clients stop prefetching) — v2's bucket model fixes this structurally (bucketId always has a next request), but clients aren't wired to it yet (Stage 2.7).
-- Mobile has **no friends UI at all**, no filters, no Watch Later, gesture-only actions, zero accessibility labels. (Stages 3–4.)
+- Mobile has **no friends UI at all**, no filters, no Watch Later flow. (Friends/filters/Watch Later remain Stage 4.)
 
 *Fixed in Stage 2.1/2.2 (`2026-08-13`):*
 - ~~Swiping left had no effect~~ — `user_media.reject_count`/`hidden_until` + `deck_impressions` (spec 24). First reject hides 14d, second 60d, third+ forever; watched/watch_later hide forever; a served-but-unacted title is suppressed 24h. Verified live: escalation sequence, undo restoring exact prior `reject_count`/`hidden_until`, and a watched title never reappearing across 4 consecutive batches.
@@ -79,6 +79,16 @@ Username + password only. Under the hood, Supabase Auth with a **synthetic email
 - `after()` background pre-build verified working locally; unverified on an actual Vercel deployment (flag isn't live there).
 
 **Next step is Stage 2.8** (retire v1 after a clean week) — this requires the user's explicit go-ahead before setting `DECK_ENGINE=v2` in Vercel, since it changes what every production user sees on the deck screen. Do not flip that flag unprompted.
+
+*Added in Stage 3.1-3.7 (`2026-08-13`) — mobile UX feedback layer, spec [`31`](spec/31-mobile-design-system.md), code-complete and typecheck-clean but **not device-verified** (no Android device connected this session):*
+- New `apps/mobile/lib/theme.ts` (color/space/radius/type/motion/elevation tokens, `hitSlopFor()`) — zero hex literals remain anywhere in `apps/mobile/app` or `apps/mobile/components`.
+- New `apps/mobile/components/Toast.tsx` (`ToastProvider`/`useToast()`, 2500ms auto-dismiss, Undo affordance, `accessibilityLiveRegion="polite"`), mounted in `_layout.tsx` alongside `SafeAreaProvider`.
+- Deck (`deck.tsx`) rewritten: directional cue overlays (right/green/check, left/red/X, up/amber/clock, down/purple/bookmark) with opacity interpolation, drag-opacity falloff to 0.7 at 300px, spring-back on an unresolved drag, exit/enter animations gated so `index` only advances from the exit-animation completion callback, a visible fallback button row (4 actions + Confirm) so no action is gesture-only, haptics per spec §4.5, ↑=Watch Later/↓=Review Later (was ↑=Review Later, no ↓), a `busyShared` shared value guarding the pan gesture's `onUpdate`/`onEnd` so a new drag can't corrupt an in-flight exit animation.
+- `review/[id].tsx` and `login.tsx` gained `SafeAreaView`/`KeyboardAvoidingView`; the review modal now fetches and shows the title being reviewed and disables Save while in flight; `createReview` failures surface as an error toast.
+- Every `Pressable` across `apps/mobile/app` has `accessibilityRole` + a non-empty `accessibilityLabel`; every interactive control measures ≥48dp including `hitSlop`.
+- Collection/Review Later/Profile/Search/Deck/Login/Review each render distinct loading/empty/error states; every `apiClient` call site has a `.catch()` (direct try/catch, or centrally via `useFocusFetch`).
+- Search actions (`search.tsx`) now emit an error toast on a failed classify, in addition to the existing await + inline saved/failed/retry row state.
+- `GET /api/v1/profile` (shared by both clients) gained `unwatchedCount`/`watchLaterCount` alongside the existing `watchedCount`/`reviewCount`/`friendsCount`; mobile Profile now shows all four counts spec 31 requires (watched/haven't/watch later/reviews) instead of three.
 
 *Fixed in Stage 1 (`2026-08-13`):*
 - ~~Series genre coverage 46%~~ — TV genre ids seeded, per-row genre-link inserts (one bad FK no longer drops a title's whole genre set), 236 genre-less rows backfilled from TMDB. **99.6% series / 99.7% movie coverage**, verified live.

@@ -1,17 +1,27 @@
+import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+  interpolate,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withTiming,
+  Extrapolation,
 } from 'react-native-reanimated';
 import type { DeckItem, ReviewStatus, WatchStatus } from '@mubitracker/shared';
 import { tmdbPosterUrl } from '@mubitracker/shared';
 import { apiClient } from '@/lib/api';
 import { enqueueOfflineAction, syncOfflineQueue } from '@/lib/offline-queue';
+import { useToast } from '@/components/Toast';
+import { color, motion, radius, space, type } from '@/lib/theme';
+
+type Action = 'unwatched' | 'watched' | 'watch_later' | 'review_later';
+type ExitDirection = 'left' | 'right' | 'up' | 'down';
 
 interface LastAction {
   mediaId: string;
@@ -22,7 +32,19 @@ interface LastAction {
   previousHiddenUntil: string | null;
 }
 
+const ACTION_META: Record<
+  Action,
+  { label: string; icon: keyof typeof Feather.glyphMap; tint: string; dir: ExitDirection }
+> = {
+  unwatched: { label: "Haven't", icon: 'x', tint: color.danger, dir: 'left' },
+  watched: { label: 'Watched', icon: 'check', tint: color.success, dir: 'right' },
+  watch_later: { label: 'Watch Later', icon: 'clock', tint: color.warning, dir: 'up' },
+  review_later: { label: 'Review Later', icon: 'bookmark', tint: color.review, dir: 'down' },
+};
+
 export default function DeckScreen() {
+  const insets = useSafeAreaInsets();
+  const showToast = useToast();
   const [queue, setQueue] = useState<DeckItem[]>([]);
   const [index, setIndex] = useState(0);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -37,9 +59,25 @@ export default function DeckScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [imdbLoading, setImdbLoading] = useState(false);
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
+  const [selectedAction, setSelectedAction] = useState<Action>('unwatched');
+  const stickyAction = useRef<Action>('unwatched');
+  const [exitDirection, setExitDirection] = useState<ExitDirection | null>(null);
+
+  const tx = useSharedValue(0);
+  const ty = useSharedValue(0);
+  const dragOpacity = useSharedValue(1);
+  const enterOpacity = useSharedValue(1);
+  const enterScale = useSharedValue(1);
+  const enterTranslateY = useSharedValue(0);
+  const cueLatched = useSharedValue(false);
+  // Mirrors `busy.current` but readable from the gesture worklet (UI
+  // thread) — a ref can't be read there. Without this, starting a new drag
+  // while the previous card is still mid-exit would overwrite tx/ty out
+  // from under the in-flight withTiming animation.
+  const busyShared = useSharedValue(false);
+
   const fetching = useRef(false);
+  const busy = useRef(false);
 
   const current = queue[index];
 
@@ -84,7 +122,7 @@ export default function DeckScreen() {
 
   useEffect(() => {
     loadDeck();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (fetching.current) return;
@@ -95,41 +133,113 @@ export default function DeckScreen() {
     if (index >= queue.length - 5) loadDeck();
   }, [index, queue.length, deckExhausted, loadDeck]);
 
-  const performAction = async (status: 'watched' | 'unwatched', reviewLater = false) => {
-    if (!current) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const prevStatus = current.userStatus ?? 'unwatched';
-    const prevReview = current.userReviewStatus ?? 'none';
-    // Record for EVERY action, review-later included. Previously this was
-    // skipped for review-later while the index still advanced, so the undo pill
-    // kept naming the prior card and undoing restored the wrong title.
-    setLastAction({
-      mediaId: current.id,
-      title: current.title,
-      previousStatus: prevStatus,
-      previousReviewStatus: prevReview,
-      previousRejectCount: current.userRejectCount ?? 0,
-      previousHiddenUntil: current.userHiddenUntil ?? null,
-    });
-    setIndex((i) => i + 1);
-    try {
-      if (reviewLater) {
-        await apiClient.reviewLater(current.id);
-      } else {
-        await apiClient.updateUserMedia(current.id, {
-          status,
-          review_status: prevReview,
-        });
-      }
-    } catch {
-      await enqueueOfflineAction({
+  const advanceAfterExit = useCallback(
+    (action: Action) => {
+      tx.value = 0;
+      ty.value = 0;
+      dragOpacity.value = 1;
+      enterOpacity.value = 0;
+      enterScale.value = 0.94;
+      enterTranslateY.value = 12;
+      setExitDirection(null);
+      setIndex((i) => i + 1);
+      // Sticky: keep the last ←/→ selection across ↑/↓ actions too (matches
+      // web DeckView.tsx's advance()) — only watched/unwatched update the
+      // sticky ref itself, read here rather than derived from `action`.
+      const sticky =
+        stickyAction.current === 'watched' || stickyAction.current === 'unwatched'
+          ? stickyAction.current
+          : 'unwatched';
+      setSelectedAction(sticky);
+      busy.current = false;
+      busyShared.value = false;
+      enterOpacity.value = withTiming(1, { duration: motion.ENTER_DURATION, easing: motion.EXIT_EASING });
+      enterScale.value = withTiming(1, { duration: motion.ENTER_DURATION, easing: motion.EXIT_EASING });
+      enterTranslateY.value = withTiming(0, { duration: motion.ENTER_DURATION, easing: motion.EXIT_EASING });
+    },
+    [busyShared, dragOpacity, enterOpacity, enterScale, enterTranslateY, tx, ty],
+  );
+
+  const performAction = useCallback(
+    async (action: Action) => {
+      if (!current) return;
+      const prevStatus = current.userStatus ?? 'unwatched';
+      const prevReview = current.userReviewStatus ?? 'none';
+      setLastAction({
         mediaId: current.id,
-        status: reviewLater ? 'watched' : status,
-        reviewStatus: reviewLater ? 'pending' : 'none',
-        timestamp: new Date().toISOString(),
+        title: current.title,
+        previousStatus: prevStatus,
+        previousReviewStatus: prevReview,
+        previousRejectCount: current.userRejectCount ?? 0,
+        previousHiddenUntil: current.userHiddenUntil ?? null,
       });
-    }
-  };
+
+      Haptics.impactAsync(
+        action === 'watched' || action === 'unwatched'
+          ? Haptics.ImpactFeedbackStyle.Medium
+          : Haptics.ImpactFeedbackStyle.Light,
+      );
+
+      try {
+        if (action === 'review_later') {
+          await apiClient.reviewLater(current.id);
+        } else if (action === 'watch_later') {
+          await apiClient.watchLater(current.id);
+        } else {
+          await apiClient.updateUserMedia(current.id, { status: action, review_status: prevReview });
+        }
+      } catch {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        await enqueueOfflineAction({
+          mediaId: current.id,
+          status: action === 'review_later' ? 'watched' : action,
+          reviewStatus: action === 'review_later' ? 'pending' : 'none',
+          timestamp: new Date().toISOString(),
+        });
+        showToast({ message: 'Saved offline — will sync when back online', tone: 'warning' });
+      }
+    },
+    [current, showToast],
+  );
+
+  const commitExit = useCallback(
+    (action: Action) => {
+      if (!current || busy.current) return;
+      busy.current = true;
+      busyShared.value = true;
+      if (action === 'watched' || action === 'unwatched') stickyAction.current = action;
+      setExitDirection(ACTION_META[action].dir);
+      cueLatched.value = false;
+
+      const { width, height } = Dimensions.get('window');
+      const cfg = { duration: motion.EXIT_DURATION, easing: motion.EXIT_EASING };
+      const dir = ACTION_META[action].dir;
+      if (dir === 'left' || dir === 'right') {
+        tx.value = withTiming((dir === 'right' ? 1 : -1) * width * 1.25, cfg);
+      } else {
+        ty.value = withTiming((dir === 'down' ? 1 : -1) * height * 0.9, cfg);
+      }
+      dragOpacity.value = withTiming(0, { duration: 180 }, (done) => {
+        if (done) runOnJS(advanceAfterExit)(action);
+      });
+
+      performAction(action);
+    },
+    [advanceAfterExit, busyShared, current, dragOpacity, performAction, tx, ty, cueLatched],
+  );
+
+  const handleConfirm = useCallback(() => {
+    commitExit(selectedAction);
+  }, [commitExit, selectedAction]);
+
+  const handleSelectAction = useCallback((action: Action) => {
+    if (action === 'watched' || action === 'unwatched') stickyAction.current = action;
+    setSelectedAction(action);
+  }, []);
+
+  const triggerCueHaptic = useCallback(() => {
+    Haptics.selectionAsync();
+  }, []);
 
   const openImdb = async () => {
     if (!current || imdbLoading) return;
@@ -157,6 +267,7 @@ export default function DeckScreen() {
         previous_reject_count: lastAction.previousRejectCount,
         previous_hidden_until: lastAction.previousHiddenUntil,
       });
+      showToast({ message: 'Undone', tone: 'neutral' });
     } catch {
       await enqueueOfflineAction({
         mediaId: lastAction.mediaId,
@@ -164,6 +275,7 @@ export default function DeckScreen() {
         reviewStatus: lastAction.previousReviewStatus,
         timestamp: new Date().toISOString(),
       });
+      showToast({ message: 'Undo saved offline — will sync when back online', tone: 'warning' });
     } finally {
       setLastAction(null);
       setUndoing(false);
@@ -171,57 +283,97 @@ export default function DeckScreen() {
   };
 
   const pan = Gesture.Pan()
+    .onBegin(() => {
+      cueLatched.value = false;
+    })
     .onUpdate((e) => {
-      translateX.value = e.translationX;
-      translateY.value = e.translationY;
+      if (busyShared.value) return;
+      tx.value = e.translationX;
+      ty.value = e.translationY;
+      dragOpacity.value = 1 - Math.min(Math.abs(e.translationX) / 300, 0.3);
+      const crossed =
+        Math.abs(e.translationX) > motion.CUE_THRESHOLD_X ||
+        Math.abs(e.translationY) > motion.CUE_THRESHOLD_Y;
+      if (crossed && !cueLatched.value) {
+        cueLatched.value = true;
+        runOnJS(triggerCueHaptic)();
+      }
     })
     .onEnd((e) => {
-      if (e.translationX > 120) {
-        runOnJS(performAction)('watched');
-      } else if (e.translationX < -120) {
-        runOnJS(performAction)('unwatched');
-      } else if (e.translationY < -100) {
-        runOnJS(performAction)('watched', true);
+      if (busyShared.value) return;
+      if (e.translationX > motion.SWIPE_THRESHOLD_X) {
+        runOnJS(commitExit)('watched');
+        return;
       }
-      translateX.value = withSpring(0);
-      translateY.value = withSpring(0);
+      if (e.translationX < -motion.SWIPE_THRESHOLD_X) {
+        runOnJS(commitExit)('unwatched');
+        return;
+      }
+      if (e.translationY < -motion.SWIPE_THRESHOLD_Y) {
+        runOnJS(commitExit)('watch_later');
+        return;
+      }
+      if (e.translationY > motion.SWIPE_THRESHOLD_Y) {
+        runOnJS(commitExit)('review_later');
+        return;
+      }
+      tx.value = withSpring(0, motion.SPRING);
+      ty.value = withSpring(0, motion.SPRING);
+      dragOpacity.value = withTiming(1, { duration: 150 });
     });
 
-  const animatedStyle = useAnimatedStyle(() => ({
+  const cardStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { rotate: `${translateX.value * 0.05}deg` },
+      { translateX: tx.value },
+      { translateY: ty.value + enterTranslateY.value },
+      { rotate: `${tx.value * motion.ROTATION_FACTOR}deg` },
+      { scale: enterScale.value },
     ],
+    opacity: dragOpacity.value * enterOpacity.value,
+  }));
+
+  const rightCueStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(tx.value, [motion.CUE_THRESHOLD_X, motion.SWIPE_THRESHOLD_X], [0, 1], Extrapolation.CLAMP),
+  }));
+  const leftCueStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(-tx.value, [motion.CUE_THRESHOLD_X, motion.SWIPE_THRESHOLD_X], [0, 1], Extrapolation.CLAMP),
+  }));
+  const upCueStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(-ty.value, [motion.CUE_THRESHOLD_Y, motion.SWIPE_THRESHOLD_Y], [0, 1], Extrapolation.CLAMP),
+  }));
+  const downCueStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(ty.value, [motion.CUE_THRESHOLD_Y, motion.SWIPE_THRESHOLD_Y], [0, 1], Extrapolation.CLAMP),
   }));
 
   if (!current) {
     if (!initialLoadDone) {
       return (
-        <View style={styles.center}>
+        <View style={[styles.center, { paddingTop: insets.top }]} accessibilityLabel="Loading deck">
           <Text style={styles.muted}>Loading deck…</Text>
         </View>
       );
     }
     if (loadError) {
       return (
-        <View style={styles.center}>
+        <View style={[styles.center, { paddingTop: insets.top }]}>
           <Text style={styles.errorText}>{loadError}</Text>
           <Pressable
-            style={({ pressed }) => [styles.retryButton, pressed && styles.undoButtonPressed]}
+            style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
             onPress={() => {
               setLoadError(null);
               setInitialLoadDone(false);
               loadDeck();
             }}
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading the deck"
           >
-            <Text style={styles.undoButtonText}>Retry</Text>
+            <Text style={styles.retryText}>Retry</Text>
           </Pressable>
         </View>
       );
     }
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { paddingTop: insets.top }]}>
         <Text style={styles.muted}>No titles match — try again later</Text>
       </View>
     );
@@ -230,69 +382,182 @@ export default function DeckScreen() {
   const poster = tmdbPosterUrl(current.posterPath, 'deck');
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.hint}>← Haven&apos;t · Watched → · ↑ Review Later</Text>
+    <View style={[styles.container, { paddingTop: insets.top + space.lg }]}>
+      <Text style={styles.hint}>← Haven&apos;t · Watched → · ↑ Watch Later · ↓ Review Later</Text>
       {lastAction && (
         <Pressable
           onPress={handleUndo}
           disabled={undoing}
-          style={({ pressed }) => [styles.undoButton, pressed && styles.undoButtonPressed]}
+          style={({ pressed }) => [styles.undoButton, pressed && styles.pressed]}
+          accessibilityRole="button"
+          accessibilityLabel={`Undo marking ${lastAction.title}`}
+          accessibilityState={{ disabled: undoing }}
         >
           <Text style={styles.undoButtonText}>
             {undoing ? 'Undoing…' : `↺ Undo "${lastAction.title}"`}
           </Text>
         </Pressable>
       )}
+
       <GestureDetector gesture={pan}>
-        <Animated.View style={[styles.card, animatedStyle]}>
-          {poster ? (
-            <Image source={{ uri: poster }} style={styles.poster} />
-          ) : (
-            <View style={[styles.poster, styles.posterPlaceholder]} />
-          )}
+        <Animated.View style={[styles.card, cardStyle]}>
+          <View style={styles.posterWrap}>
+            {poster ? (
+              <Image source={{ uri: poster }} style={styles.poster} />
+            ) : (
+              <View style={[styles.poster, styles.posterPlaceholder]} />
+            )}
+            <Animated.View style={[styles.cue, styles.cueRight, rightCueStyle]} pointerEvents="none">
+              <Feather name="check" size={64} color={color.success} />
+            </Animated.View>
+            <Animated.View style={[styles.cue, styles.cueLeft, leftCueStyle]} pointerEvents="none">
+              <Feather name="x" size={64} color={color.danger} />
+            </Animated.View>
+            <Animated.View style={[styles.cue, styles.cueUp, upCueStyle]} pointerEvents="none">
+              <Feather name="clock" size={64} color={color.warning} />
+            </Animated.View>
+            <Animated.View style={[styles.cue, styles.cueDown, downCueStyle]} pointerEvents="none">
+              <Feather name="bookmark" size={64} color={color.review} />
+            </Animated.View>
+          </View>
           <Text style={styles.title}>{current.title}</Text>
           <Text style={styles.meta}>
             {current.year ?? '—'} · {current.displayType}
           </Text>
         </Animated.View>
       </GestureDetector>
-      <Pressable onPress={openImdb} disabled={imdbLoading} hitSlop={12}>
+
+      <Pressable
+        onPress={openImdb}
+        disabled={imdbLoading}
+        hitSlop={12}
+        style={styles.imdbHit}
+        accessibilityRole="link"
+        accessibilityLabel={`Open ${current.title} on IMDb`}
+      >
         <Text style={styles.imdbLink}>{imdbLoading ? 'Opening…' : 'IMDb ↗'}</Text>
+      </Pressable>
+
+      <View style={[styles.actionsRow, { paddingBottom: insets.bottom + space.md }]}>
+        <ActionButton action="unwatched" selected={selectedAction} onPress={handleSelectAction} title={current.title} disabled={!!exitDirection} />
+        <ActionButton action="watched" selected={selectedAction} onPress={handleSelectAction} title={current.title} disabled={!!exitDirection} />
+      </View>
+      <View style={styles.actionsRow}>
+        <ActionButton action="watch_later" selected={selectedAction} onPress={handleSelectAction} title={current.title} disabled={!!exitDirection} />
+        <ActionButton action="review_later" selected={selectedAction} onPress={handleSelectAction} title={current.title} disabled={!!exitDirection} />
+      </View>
+      <Pressable
+        onPress={handleConfirm}
+        disabled={!!exitDirection}
+        style={({ pressed }) => [styles.confirmBtn, (pressed || exitDirection) && styles.pressed]}
+        accessibilityRole="button"
+        accessibilityLabel={`Confirm ${ACTION_META[selectedAction].label} for ${current.title}`}
+        accessibilityState={{ disabled: !!exitDirection }}
+      >
+        <Text style={styles.confirmText}>Confirm</Text>
       </Pressable>
     </View>
   );
 }
 
+function ActionButton({
+  action,
+  selected,
+  onPress,
+  title,
+  disabled,
+}: {
+  action: Action;
+  selected: Action;
+  onPress: (a: Action) => void;
+  title: string;
+  disabled?: boolean;
+}) {
+  const meta = ACTION_META[action];
+  const isSelected = selected === action;
+  return (
+    <Pressable
+      onPress={() => onPress(action)}
+      disabled={disabled}
+      style={({ pressed }) => [
+        styles.actionBtn,
+        isSelected && { borderColor: meta.tint, backgroundColor: `${meta.tint}22` },
+        (pressed || disabled) && styles.pressed,
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={`Select ${meta.label} for ${title}`}
+      accessibilityState={{ selected: isSelected, disabled }}
+    >
+      <Feather name={meta.icon} size={16} color={isSelected ? meta.tint : color.textMuted} />
+      <Text style={[styles.actionBtnText, isSelected && { color: meta.tint }]}>{meta.label}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#09090b', alignItems: 'center', justifyContent: 'center', padding: 16 },
-  center: { flex: 1, backgroundColor: '#09090b', alignItems: 'center', justifyContent: 'center' },
-  hint: { position: 'absolute', top: 60, color: '#71717a', fontSize: 12 },
+  container: { flex: 1, backgroundColor: color.bg, alignItems: 'center', paddingHorizontal: space.lg },
+  center: { flex: 1, backgroundColor: color.bg, alignItems: 'center', justifyContent: 'center', padding: space.xl },
+  hint: { color: color.textMuted, fontSize: type.caption.fontSize, marginBottom: space.sm, textAlign: 'center' },
   undoButton: {
-    position: 'absolute',
-    top: 90,
-    backgroundColor: '#18181b',
-    borderColor: '#27272a',
+    backgroundColor: color.surface,
+    borderColor: color.border,
     borderWidth: 1,
-    borderRadius: 999,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    borderRadius: radius.pill,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.lg,
+    minHeight: 48,
+    justifyContent: 'center',
+    marginBottom: space.sm,
   },
-  undoButtonPressed: { opacity: 0.6 },
-  undoButtonText: { color: '#f4f4f5', fontSize: 13, fontWeight: '600' },
-  errorText: { color: '#f87171', fontSize: 14, textAlign: 'center', marginBottom: 16, paddingHorizontal: 24 },
+  pressed: { opacity: 0.7 },
+  undoButtonText: { color: color.text, fontSize: type.label.fontSize, fontWeight: '600' },
+  errorText: { color: color.danger, fontSize: type.body.fontSize, textAlign: 'center', marginBottom: space.lg },
   retryButton: {
-    backgroundColor: '#18181b',
-    borderColor: '#27272a',
+    backgroundColor: color.surface,
+    borderColor: color.border,
     borderWidth: 1,
-    borderRadius: 999,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    borderRadius: radius.pill,
+    paddingVertical: space.md,
+    paddingHorizontal: space.xl,
+    minHeight: 48,
+    justifyContent: 'center',
   },
-  card: { alignItems: 'center', width: '100%' },
-  poster: { width: 220, height: 330, borderRadius: 12, marginBottom: 16 },
-  posterPlaceholder: { backgroundColor: '#27272a' },
-  title: { color: '#fff', fontSize: 22, fontWeight: '700', textAlign: 'center' },
-  meta: { color: '#71717a', fontSize: 14, marginTop: 4 },
-  imdbLink: { color: '#71717a', fontSize: 13, marginTop: 16, fontWeight: '600' },
-  muted: { color: '#71717a' },
+  retryText: { color: color.text, fontWeight: '600' },
+  card: { alignItems: 'center', width: '100%', flexShrink: 1 },
+  posterWrap: { width: 220, height: 330, borderRadius: radius.md, overflow: 'hidden', marginBottom: space.md },
+  poster: { width: '100%', height: '100%' },
+  posterPlaceholder: { backgroundColor: color.surfaceHigh },
+  cue: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  cueRight: { backgroundColor: `${color.success}33` },
+  cueLeft: { backgroundColor: `${color.danger}33` },
+  cueUp: { backgroundColor: `${color.warning}33` },
+  cueDown: { backgroundColor: `${color.review}33` },
+  title: { color: color.text, ...type.title, textAlign: 'center' },
+  meta: { color: color.textMuted, fontSize: type.body.fontSize, marginTop: space.xs },
+  imdbHit: { minHeight: 48, justifyContent: 'center', marginTop: space.sm },
+  imdbLink: { color: color.textMuted, fontSize: type.caption.fontSize, fontWeight: '600' },
+  actionsRow: { flexDirection: 'row', gap: space.sm, width: '100%', marginTop: space.sm },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.xs,
+    minHeight: 48,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: color.border,
+  },
+  actionBtnText: { color: color.textMuted, fontSize: type.label.fontSize, fontWeight: '600' },
+  confirmBtn: {
+    width: '100%',
+    minHeight: 48,
+    borderRadius: radius.md,
+    backgroundColor: color.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: space.sm,
+  },
+  confirmText: { color: color.onPrimary, fontSize: type.label.fontSize, fontWeight: '700' },
+  muted: { color: color.textMuted },
 });

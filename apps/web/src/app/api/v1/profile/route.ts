@@ -18,20 +18,35 @@ export async function GET(request: NextRequest) {
 
     if (error || !profile) return apiError('NOT_FOUND', 'Profile not found', 404);
 
-    const [{ count: watchedCount }, { count: reviewCount }, { count: friendsCount }] =
-      await Promise.all([
-        supabase
-          .from('user_media')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .eq('status', 'watched'),
-        supabase.from('reviews').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-        supabase
-          .from('friendships')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'accepted')
-          .or(friendshipInvolvingUserFilter(user.id)),
-      ]);
+    const [
+      { count: watchedCount },
+      { count: unwatchedCount },
+      { count: watchLaterCount },
+      { count: reviewCount },
+      { count: friendsCount },
+    ] = await Promise.all([
+      supabase
+        .from('user_media')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('status', 'watched'),
+      supabase
+        .from('user_media')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('status', 'unwatched'),
+      supabase
+        .from('user_media')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('status', 'watch_later'),
+      supabase.from('reviews').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
+      supabase
+        .from('friendships')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'accepted')
+        .or(friendshipInvolvingUserFilter(user.id)),
+    ]);
 
     return apiOk({
       id: profile.id,
@@ -41,6 +56,8 @@ export async function GET(request: NextRequest) {
       collectionVisibility: profile.collection_visibility,
       reviewsVisibility: profile.reviews_visibility,
       watchedCount: watchedCount ?? 0,
+      unwatchedCount: unwatchedCount ?? 0,
+      watchLaterCount: watchLaterCount ?? 0,
       reviewCount: reviewCount ?? 0,
       friendsCount: friendsCount ?? 0,
     });

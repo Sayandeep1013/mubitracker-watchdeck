@@ -4,6 +4,7 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { apiClient } from '@/lib/api';
 import { useFocusFetch } from '@/lib/useFocusFetch';
 import { ScreenState } from '@/components/ScreenState';
+import { color, radius, space, type } from '@/lib/theme';
 
 interface PendingItem {
   id: string;
@@ -55,16 +56,16 @@ export default function ReviewLaterScreen() {
 }
 
 const styles = StyleSheet.create({
-  list: { flex: 1, backgroundColor: '#09090b' },
-  container: { padding: 16 },
+  list: { flex: 1, backgroundColor: color.bg },
+  container: { padding: space.lg },
   row: {
     minHeight: 48,
-    padding: 16,
-    backgroundColor: '#18181b',
-    borderRadius: 8,
-    marginBottom: 8,
+    padding: space.lg,
+    backgroundColor: color.surface,
+    borderRadius: radius.sm,
+    marginBottom: space.sm,
   },
   pressed: { opacity: 0.6 },
-  title: { color: '#fafafa', fontWeight: '600' },
-  meta: { color: '#71717a', fontSize: 12, marginTop: 2 },
+  title: { color: color.text, fontWeight: '600' },
+  meta: { color: color.textMuted, fontSize: type.caption.fontSize, marginTop: 2 },
 });

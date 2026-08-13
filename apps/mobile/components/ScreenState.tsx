@@ -1,4 +1,5 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { color, radius, space } from '@/lib/theme';
 
 interface ScreenStateProps {
   loading?: boolean;
@@ -24,7 +25,7 @@ export function ScreenState({
   if (loading) {
     return (
       <View style={styles.center} accessibilityLabel="Loading">
-        <ActivityIndicator color="#ef4444" />
+        <ActivityIndicator color={color.primary} />
       </View>
     );
   }
@@ -59,18 +60,18 @@ export function ScreenState({
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  muted: { color: '#71717a', textAlign: 'center' },
-  error: { color: '#f87171', textAlign: 'center', marginBottom: 16 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.xl },
+  muted: { color: color.textMuted, textAlign: 'center' },
+  error: { color: color.danger, textAlign: 'center', marginBottom: space.lg },
   retry: {
     minHeight: 48,
     justifyContent: 'center',
-    paddingHorizontal: 24,
-    borderRadius: 999,
+    paddingHorizontal: space.xl,
+    borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: '#27272a',
-    backgroundColor: '#18181b',
+    borderColor: color.border,
+    backgroundColor: color.surface,
   },
   pressed: { opacity: 0.6 },
-  retryText: { color: '#fafafa', fontWeight: '600' },
+  retryText: { color: color.text, fontWeight: '600' },
 });

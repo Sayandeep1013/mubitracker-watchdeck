@@ -1,5 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import { color as themeColor } from '@/lib/theme';
 
 type FeatherName = keyof typeof Feather.glyphMap;
 
@@ -13,11 +14,11 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerStyle: { backgroundColor: '#09090b' },
-        headerTintColor: '#fff',
-        tabBarStyle: { backgroundColor: '#09090b', borderTopColor: '#27272a' },
-        tabBarActiveTintColor: '#fff',
-        tabBarInactiveTintColor: '#71717a',
+        headerStyle: { backgroundColor: themeColor.bg },
+        headerTintColor: themeColor.text,
+        tabBarStyle: { backgroundColor: themeColor.bg, borderTopColor: themeColor.border },
+        tabBarActiveTintColor: themeColor.text,
+        tabBarInactiveTintColor: themeColor.textMuted,
       }}
     >
       <Tabs.Screen name="deck" options={{ title: 'Deck', tabBarIcon: TabIcon('layers') }} />

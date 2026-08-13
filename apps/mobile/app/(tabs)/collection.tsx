@@ -4,6 +4,7 @@ import { tmdbPosterUrl } from '@mubitracker/shared';
 import { apiClient } from '@/lib/api';
 import { useFocusFetch } from '@/lib/useFocusFetch';
 import { ScreenState } from '@/components/ScreenState';
+import { color, radius, space, type } from '@/lib/theme';
 
 interface CollectionItem {
   id: string;
@@ -43,7 +44,7 @@ export default function CollectionScreen() {
       renderItem={({ item }) => {
         const poster = tmdbPosterUrl(item.posterPath, 'card');
         return (
-          <View style={styles.card} accessibilityLabel={`${item.title}, ${item.status}`}>
+          <View style={styles.card} accessibilityLabel={`${item.title}, ${item.status.replace('_', ' ')}`}>
             {poster ? (
               <Image source={{ uri: poster }} style={styles.poster} />
             ) : (
@@ -61,11 +62,11 @@ export default function CollectionScreen() {
 }
 
 const styles = StyleSheet.create({
-  list: { flex: 1, backgroundColor: '#09090b' },
-  container: { padding: 8 },
-  card: { flex: 1, margin: 4, padding: 8, backgroundColor: '#18181b', borderRadius: 8 },
-  poster: { width: '100%', aspectRatio: 2 / 3, borderRadius: 4, marginBottom: 4 },
-  posterPlaceholder: { backgroundColor: '#27272a' },
-  title: { color: '#fafafa', fontSize: 12 },
-  status: { color: '#71717a', fontSize: 10, textTransform: 'capitalize' },
+  list: { flex: 1, backgroundColor: color.bg },
+  container: { padding: space.sm },
+  card: { flex: 1, margin: space.xs, padding: space.sm, backgroundColor: color.surface, borderRadius: radius.sm },
+  poster: { width: '100%', aspectRatio: 2 / 3, borderRadius: radius.sm / 2, marginBottom: space.xs },
+  posterPlaceholder: { backgroundColor: color.surfaceHigh },
+  title: { color: color.text, fontSize: type.caption.fontSize },
+  status: { color: color.textMuted, fontSize: 10, textTransform: 'capitalize' },
 });

@@ -1,8 +1,18 @@
 import { usernameToAuthEmail } from '@mubitracker/shared';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { supabase } from '@/lib/supabase';
+import { color, radius, space, type } from '@/lib/theme';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
 
@@ -48,51 +58,87 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.logo}>Mubitracker</Text>
-      <TextInput
-        value={username}
-        onChangeText={setUsername}
-        placeholder="Username"
-        placeholderTextColor="#71717a"
-        autoCapitalize="none"
-        autoCorrect={false}
-        style={styles.input}
-      />
-      <TextInput
-        value={password}
-        onChangeText={setPassword}
-        placeholder="Password"
-        placeholderTextColor="#71717a"
-        secureTextEntry
-        style={styles.input}
-      />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Pressable style={styles.btn} onPress={submit} disabled={loading}>
-        <Text style={styles.btnText}>
-          {loading ? '...' : mode === 'login' ? 'Sign In' : 'Create Account'}
-        </Text>
-      </Pressable>
-      <Pressable
-        onPress={() => {
-          setMode(mode === 'login' ? 'signup' : 'login');
-          setError('');
-        }}
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.switch}>
-          {mode === 'login' ? 'Need an account? Sign up' : 'Have an account? Sign in'}
-        </Text>
-      </Pressable>
-    </View>
+        <Text style={styles.logo}>Mubitracker</Text>
+        <TextInput
+          value={username}
+          onChangeText={setUsername}
+          placeholder="Username"
+          placeholderTextColor={color.textMuted}
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={styles.input}
+          accessibilityLabel="Username"
+        />
+        <TextInput
+          value={password}
+          onChangeText={setPassword}
+          placeholder="Password"
+          placeholderTextColor={color.textMuted}
+          secureTextEntry
+          style={styles.input}
+          accessibilityLabel="Password"
+        />
+        {error ? (
+          <Text style={styles.error} accessibilityLiveRegion="polite">
+            {error}
+          </Text>
+        ) : null}
+        <Pressable
+          style={({ pressed }) => [styles.btn, pressed && styles.pressed, loading && styles.disabled]}
+          onPress={submit}
+          disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel={mode === 'login' ? 'Sign in' : 'Create account'}
+          accessibilityState={{ disabled: loading }}
+        >
+          <Text style={styles.btnText}>
+            {loading ? '…' : mode === 'login' ? 'Sign In' : 'Create Account'}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => {
+            setMode(mode === 'login' ? 'signup' : 'login');
+            setError('');
+          }}
+          hitSlop={8}
+          style={styles.switchHit}
+          accessibilityRole="button"
+          accessibilityLabel={mode === 'login' ? 'Switch to sign up' : 'Switch to sign in'}
+        >
+          <Text style={styles.switch}>
+            {mode === 'login' ? 'Need an account? Sign up' : 'Have an account? Sign in'}
+          </Text>
+        </Pressable>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#09090b', justifyContent: 'center', padding: 24 },
-  logo: { color: '#fff', fontSize: 32, fontWeight: '700', textAlign: 'center', marginBottom: 32 },
-  input: { backgroundColor: '#18181b', borderRadius: 8, padding: 16, color: '#fff', marginBottom: 12 },
-  error: { color: '#f87171', marginBottom: 12, fontSize: 13 },
-  btn: { backgroundColor: '#dc2626', padding: 16, borderRadius: 8 },
-  btnText: { color: '#fff', textAlign: 'center', fontWeight: '600' },
-  switch: { color: '#a1a1aa', textAlign: 'center', marginTop: 16 },
+  flex: { flex: 1, backgroundColor: color.bg },
+  container: { flexGrow: 1, justifyContent: 'center', padding: space.xl },
+  logo: { color: color.text, ...type.display, textAlign: 'center', marginBottom: space.xxl },
+  input: {
+    backgroundColor: color.surface,
+    borderRadius: radius.sm,
+    padding: space.lg,
+    color: color.text,
+    marginBottom: space.md,
+    minHeight: 48,
+  },
+  error: { color: color.danger, marginBottom: space.md, fontSize: type.caption.fontSize },
+  btn: { backgroundColor: color.primary, padding: space.lg, borderRadius: radius.sm, minHeight: 48, justifyContent: 'center' },
+  pressed: { opacity: 0.8 },
+  disabled: { opacity: 0.5 },
+  btnText: { color: color.onPrimary, textAlign: 'center', fontWeight: '600' },
+  switchHit: { minHeight: 48, justifyContent: 'center' },
+  switch: { color: color.textMuted, textAlign: 'center', marginTop: space.lg },
 });

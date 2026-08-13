@@ -9,6 +9,8 @@ export interface Profile {
   collectionVisibility: PrivacyLevel;
   reviewsVisibility: PrivacyLevel;
   watchedCount?: number;
+  unwatchedCount?: number;
+  watchLaterCount?: number;
   reviewCount?: number;
   friendsCount?: number;
 }

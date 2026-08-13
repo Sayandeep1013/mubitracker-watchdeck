@@ -10,35 +10,43 @@ Read after [`CONTEXT.md`](CONTEXT.md). Then work [`IMPLEMENTATION-PLAN.md`](IMPL
 ```
 Read docs/CONTEXT.md, docs/HANDOFF.md, and docs/IMPLEMENTATION-PLAN.md.
 
-Stages 0-1 and Stage 2.1-2.7 are all done — that's the entire deck-engine
-v2 rewrite (cooldown/exclusion, taste model, corpus ingestion, bucket
-service, background pre-build, both clients wired). It ships behind
-`DECK_ENGINE=v2`, which is NOT set in Vercel — production is still v1,
-unaffected, byte-for-byte the same behavior it had before this session.
+Stages 0-1, Stage 2.1-2.7, and Stage 3.1-3.7 are all done. Stage 2 is the
+entire deck-engine v2 rewrite (cooldown/exclusion, taste model, corpus
+ingestion, bucket service, background pre-build, both clients wired) —
+it ships behind `DECK_ENGINE=v2`, which is NOT set in Vercel, so
+production is still v1, unaffected, byte-for-byte the same behavior it
+had before this session. Stage 3.1-3.7 is the mobile UX feedback layer
+(theme tokens, deck animations/gestures/fallback buttons, toast,
+safe areas/keyboard, accessibility, per-screen loading/empty/error
+states) — code-complete and typecheck-clean, but this session never had
+an Android device connected, so **none of it has been visually or
+interactively confirmed**. Treat it as a strong risk area, not "done."
 
-Continue with 2.8: retire v1 behind the flag after a clean week. Concretely
-that means: (1) set `DECK_ENGINE=v2` in Vercel, (2) watch production for a
-week for `deck_empty`-equivalent failures (there's no analytics yet —
-Stage 5.1 — so this means manually checking Vercel logs / Supabase logs
-for errors on `/api/v1/deck`, and asking the user directly whether the
-deck feels different/broken), (3) only once that week is clean, delete
-`generate.ts` and the `supportsBucketAlgorithm`/engine-branch in
-`route.ts`, and simplify both clients back down to bucket-only logic
-(drop the `engineMode`/cursor fallback paths). Do NOT flip the flag
-without telling the user first — it changes what every production user
-sees on the deck screen, which is exactly the kind of user-visible
-production change that needs a heads-up, not just a green CI run.
+Two things are explicitly waiting on the user, not on you:
+1. **Stage 2.8** (flip `DECK_ENGINE=v2` in Vercel) — user-visible
+   production change, needs a direct go-ahead first. Don't flip it
+   unprompted even if everything else looks green.
+2. **Stage 3.1-3.7 device verification** — if my Android device is
+   connected (check: adb devices), manually run through the deck's
+   gestures/buttons, toast, keyboard handling, and each screen's
+   loading/empty/error states before promoting any of `[~]` 3.1-3.7 to
+   `[x]`. No Maestro flows exist for these yet (Stage 0's flows don't
+   cover Stage 3's new UI) — write them if you have device access, or do
+   a manual pass and note in the Session Log exactly what you checked.
 
-Also still open from 2.5-2.7's own verification, worth closing before 2.8:
-- Real production latency (Vercel bom1 ↔ Supabase ap-south-1) is
-  unmeasured — only local-dev-to-Supabase WAN timing exists. Once the flag
-  is on in a preview/staging deploy, re-measure bucket build p95 there.
-- The build lock is best-effort (2/3 concurrent cold requests produced 2
-  builds in testing), not airtight.
-- Mobile's bucket-mode wiring is typecheck-only — no Android device was
-  connected this session to actually drive it (check `adb devices`; if
-  connected, run through `mobile-qa/flows/` or manually swipe with
-  `DECK_ENGINE=v2` set on the dev server the phone points at).
+Continue with **3.8: web polish** (spec 32) — deck skeleton + retry,
+review editor shows the title, invalid Tailwind classes
+(`text-neutral-00` / `text-neutral-????00` in
+apps/web/src/app/profile/page.tsx / about page), self-host the broken
+TMDB logo, review-later empty state names the wrong key, import error
+messages, lowercase chips. This is web-side, so verify it the way 2.7
+was verified: a real headless Playwright browser session, not just
+typecheck.
+
+After 3.8, Stage 3 is fully shipped (mobile portion still `[~]` pending
+device). Move to Stage 4 (friends/filters/Watch Later parity on mobile) —
+independent of 2.8, can start regardless of whether the flag has been
+flipped yet.
 
 For each item: implement → pnpm typecheck → write/extend its test →
 verify against the acceptance criterion → commit → update the checkbox
@@ -48,11 +56,6 @@ There is no staging Supabase yet (Stage 5.5) — migrations and verification
 queries run directly against production. Use the Supabase MCP for
 migrations/queries; keep them additive and reversible where possible.
 
-If my Android device is connected (check: adb devices), first clear the
-Stage 0 mobile items still marked [~] by running:
-  maestro test mobile-qa/flows/
-and promote them to [x] only if they pass.
-
 Stop and ask me only if an item needs a product decision that isn't
 already settled in docs/spec/. Otherwise keep going.
 
@@ -60,11 +63,11 @@ When you finish a stage, update this prompt block and tell me what
 changed.
 ```
 
-**Current position: Stage 1 and all of Stage 2 (2.1-2.7) shipped (`2026-08-13`), behind `DECK_ENGINE=v2` (unset in prod — v1 still serves production unchanged). Stage 2.8 (retire v1 after a clean week) is next, and needs the user's go-ahead before flipping the flag.**
+**Current position: Stage 1, all of Stage 2 (2.1-2.7), and Stage 3.1-3.7 shipped (`2026-08-13`). Deck v2 is behind `DECK_ENGINE=v2` (unset in prod — v1 still serves production unchanged); Stage 2.8 needs the user's go-ahead before flipping the flag. Stage 3.1-3.7 is code-complete/typecheck-clean but `[~]` — no Android device this session, so it's unverified on-device. Next up: Stage 3.8 (web polish), verifiable now via headless Playwright.**
 
 ### Pending verification
 
-Code-complete but unverified — all four need the Android device. Maestro flows are already written; run `maestro test mobile-qa/flows/`.
+Code-complete but unverified — all need the Android device. Maestro flows already exist for the Stage 0 items; run `maestro test mobile-qa/flows/`. Stage 3 items have no dedicated flows yet — needs a manual pass or new flows before promoting to `[x]`.
 
 | Item | Flow |
 |---|---|
@@ -72,6 +75,7 @@ Code-complete but unverified — all four need the Android device. Maestro flows
 | 0.2 tabs never refresh | `mobile-qa/flows/tab-refresh.yaml` |
 | 0.5 undo desync after review-later | `mobile-qa/flows/undo-after-review-later.yaml` |
 | 0.7 mobile error handling | covered incidentally by the above; no dedicated flow yet |
+| 3.1-3.7 mobile UX layer (theme, deck animation/gestures/a11y, toast, safe areas, per-screen states) | none yet — needs manual pass or new Maestro flows; see Session Log entry below for exact scope |
 
 ---
 
@@ -101,6 +105,24 @@ This is the mechanism that lets a session run without the user in the loop. Foll
 ## Session Log
 
 Newest first. One line per completed item; a block per stage.
+
+### 2026-08-13 — Stage 3.1-3.7 (mobile UX feedback layer)
+
+Spec [`31`](spec/31-mobile-design-system.md). Independent of the deck-engine-v2 work above — this is purely client-side polish on `apps/mobile`. All seven items shipped in one pass since they share the same theme/token foundation and touch overlapping files.
+
+| Item | Change |
+|---|---|
+| 3.1 | New `apps/mobile/lib/theme.ts`: `color`/`space`/`radius`/`type`/`motion`/`elevation` tokens plus `hitSlopFor()`. Every screen and component under `apps/mobile/app` and `apps/mobile/components` now imports from it — confirmed zero hex literals remain via `grep -rE '#[0-9a-fA-F]{3,8}'` across both directories. Resolves the accent-colour drift noted in the audit (login was `#dc2626`, web `#ef4444` — both now derive from the same `color.primary` concept per-platform). |
+| 3.2 | `deck.tsx` rewritten with Reanimated: four directional cue overlays (right/green/check, left/red/X, up/amber/clock, down/purple/bookmark) that fade in via `interpolate` between `motion.CUE_THRESHOLD_*` and `motion.SWIPE_THRESHOLD_*`; card opacity falls to 0.7 at 300px drag; a committed swipe runs an exit `withTiming` (position + fade) whose completion callback — not the gesture handler itself — is what advances `index` and kicks off the enter animation, so there's no mid-flight card swap. An unresolved drag springs back (`withSpring`). |
+| 3.3 | New `apps/mobile/components/Toast.tsx`: `ToastProvider` + `useToast()`, single toast at a time (a new one replaces the current one), 2500ms auto-dismiss, `accessibilityLiveRegion="polite"`, optional Undo action slot. Mounted in `_layout.tsx` inside the new `SafeAreaProvider`. |
+| 3.4 | `_layout.tsx` gained `SafeAreaProvider`; `review/[id].tsx` (a `presentation: 'modal'` route that was rendering under the status bar) now wraps in `SafeAreaView edges={['top','bottom']}` + `KeyboardAvoidingView`; `login.tsx` gained the same `KeyboardAvoidingView` + `ScrollView` wrapping so the submit button stays reachable with the keyboard open. |
+| 3.5 | Every `Pressable` under `apps/mobile/app` now has `accessibilityRole` and a non-empty, object-specific `accessibilityLabel` (e.g. `"Mark The Godfather as watched"`, not `"Watched"`) — confirmed by grepping for `Pressable` vs `accessibilityLabel` counts per file. `imdbHit` (deck.tsx) and `actionHit` (search.tsx) were both `minHeight: 44`, under the 48dp requirement — fixed to 48. The deck gained a full 4-button + Confirm fallback row so no classification is gesture-only. |
+| 3.6 | Deck gesture map unified with web: ↑ now writes Watch Later (was Review Later, and Watch Later was unreachable by any gesture), ↓ now writes Review Later (was absent entirely). `handleUndo` and the sticky-action logic were updated to match — sticky `←`/`→` selection persists across ↑/↓ actions exactly like `DeckView.tsx`'s `advance()`, including the case where the on-screen buttons (not a gesture) set the selection. |
+| 3.7 | Collection, Review Later, Search, Profile, Login, Review, and Deck each render distinct loading/empty/error states (`ScreenState` component or inline equivalents); every `apiClient` call site in `apps/mobile/app` has a `.catch()` — either directly (deck, profile export, search, review save) or centrally via `useFocusFetch` (collection, review-later, profile fetch), which was itself added in Stage 0 specifically to guarantee this. Search's classify action (`mark()`) now also emits an error toast on failure, in addition to its existing inline saved/failed/retry row state — closes the "await, update the row, and emit a toast" acceptance line, which previously only had the first two. Profile's stats card now shows all four counts spec 31 requires (watched / haven't / watch later / reviews) instead of three (watched / reviews / friends) — required adding `unwatchedCount`/`watchLaterCount` to `GET /api/v1/profile` (additive fields, `Profile` type in `@mubitracker/shared`), consumed by both clients without touching web's own profile page (still 3 stats there — that's Stage 3.8's concern, not touched this pass). |
+
+**One real bug found by code review, not by running it:** the pan gesture's `onUpdate`/`onEnd` worklets had no guard against a new drag starting while the previous card's exit animation was still in flight — starting a drag mid-exit would directly overwrite `tx.value`/`ty.value` out from under the in-flight `withTiming`, visually corrupting the animation. `busy.current` (the existing plain-JS-ref guard used elsewhere) can't be read from a worklet running on the UI thread, so a new `busyShared` shared value mirrors it: set `true` in `commitExit`, set `false` in `advanceAfterExit`, checked at the top of both `onUpdate` and `onEnd`.
+
+**Not verified on-device.** No Android device or emulator was connected this session — everything above is `pnpm typecheck` clean and was checked by careful reading (grep for hex literals, `accessibilityLabel` counts, 48dp targets, gesture/sticky-action logic traced by hand) rather than by actually swiping, tapping, or seeing the toast render. This is a meaningfully weaker verification bar than Stage 2.7's web work (a real headless Playwright browser actually drove that). All seven items are left at `[~]` in `IMPLEMENTATION-PLAN.md`, not `[x]` — see *Pending verification* above. Do not promote them without an actual device pass.
 
 ### 2026-08-13 — Stage 2.7 (wire both clients to buckets)
 

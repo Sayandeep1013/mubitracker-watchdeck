@@ -3,7 +3,10 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
+import { ToastProvider } from '@/components/Toast';
+import { color } from '@/lib/theme';
 
 function useAuthGuard() {
   const [checked, setChecked] = useState(false);
@@ -65,24 +68,28 @@ export default function RootLayout() {
   const checked = useAuthGuard();
 
   return (
-    <GestureHandlerRootView style={styles.root}>
-      <StatusBar style="light" />
-      {checked ? (
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="login" />
-          <Stack.Screen name="review/[id]" options={{ presentation: 'modal' }} />
-        </Stack>
-      ) : (
-        <View style={styles.splash} accessibilityLabel="Loading Mubitracker">
-          <ActivityIndicator color="#ef4444" size="large" />
-        </View>
-      )}
-    </GestureHandlerRootView>
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={styles.root}>
+        <ToastProvider>
+          <StatusBar style="light" />
+          {checked ? (
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="login" />
+              <Stack.Screen name="review/[id]" options={{ presentation: 'modal' }} />
+            </Stack>
+          ) : (
+            <View style={styles.splash} accessibilityLabel="Loading Mubitracker">
+              <ActivityIndicator color={color.primary} size="large" />
+            </View>
+          )}
+        </ToastProvider>
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  splash: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#09090b' },
+  splash: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: color.bg },
 });
