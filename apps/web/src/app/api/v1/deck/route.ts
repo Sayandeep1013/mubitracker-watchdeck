@@ -3,7 +3,12 @@ import { after } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { DECK_BATCH_SIZE } from '@mubitracker/shared';
 import { apiError, apiOk, AuthError, requireAuth } from '@/lib/api/helpers';
-import { generateDeck, parseDeckFilters, type ParsedDeckFilters } from '@/lib/deck/generate';
+import {
+  FriendAccessError,
+  generateDeck,
+  parseDeckFilters,
+  type ParsedDeckFilters,
+} from '@/lib/deck/generate';
 import {
   buildBucket,
   computeFilterHash,
@@ -53,6 +58,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (e) {
     if (e instanceof AuthError) return apiError('UNAUTHORIZED', e.message, 401);
+    if (e instanceof FriendAccessError) return apiError(e.code, e.message, e.status);
     return apiError('INTERNAL', e instanceof Error ? e.message : 'Deck generation failed', 500);
   }
 }

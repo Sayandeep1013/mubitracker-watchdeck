@@ -11,6 +11,7 @@ async function enrichFriendship(
     requester_id: string;
     receiver_id: string;
     status: string;
+    blocked_by?: string | null;
   },
   userId: string,
 ) {
@@ -25,6 +26,7 @@ async function enrichFriendship(
     requesterId: f.requester_id,
     receiverId: f.receiver_id,
     status: f.status,
+    blockedBy: f.blocked_by ?? null,
     direction: f.requester_id === userId ? 'outgoing' : 'incoming',
     friend: profile
       ? { id: profile.id, username: profile.username, avatarUrl: profile.avatar_url }
@@ -50,6 +52,8 @@ export async function GET(request: NextRequest) {
       query = query.eq('status', 'pending').eq('receiver_id', user.id);
     } else if (status === 'pending_out') {
       query = query.eq('status', 'pending').eq('requester_id', user.id);
+    } else if (status === 'blocked') {
+      query = query.eq('status', 'blocked');
     } else {
       query = query.neq('status', 'blocked');
     }
@@ -89,29 +93,35 @@ export async function POST(request: NextRequest) {
       return apiError('BAD_REQUEST', 'Invalid friend request', 400);
     }
 
-    // Any blocked relationship either direction?
-    const { data: blocked } = await supabase
-      .from('friendships')
-      .select('id, status')
-      .eq('status', 'blocked')
-      .or(friendshipPairFilter(user.id, targetId))
-      .maybeSingle();
-    if (blocked) return apiError('FORBIDDEN', 'Cannot send request to this user', 403);
-
-    // Reverse pending → auto-accept
-    const { data: reverse } = await supabase
+    // Load any existing row for this pair, in either direction, and branch
+    // on its status. Previously this only checked for 'blocked' and a
+    // reverse-'pending' row — an existing reverse-'accepted' row fell
+    // through to the insert below and created a second row for the same
+    // pair (spec 40 §6), since UNIQUE(requester_id, receiver_id) only
+    // protects one direction.
+    const { data: existing } = await supabase
       .from('friendships')
       .select('*')
-      .eq('requester_id', targetId)
-      .eq('receiver_id', user.id)
-      .eq('status', 'pending')
+      .or(friendshipPairFilter(user.id, targetId))
       .maybeSingle();
 
-    if (reverse) {
+    if (existing?.status === 'blocked') {
+      return apiError('FORBIDDEN', 'Cannot send request to this user', 403);
+    }
+
+    if (existing?.status === 'accepted') {
+      return apiError('ALREADY_FRIENDS', 'You are already friends', 409);
+    }
+
+    if (existing?.status === 'pending') {
+      if (existing.requester_id === user.id) {
+        return apiError('REQUEST_PENDING', 'Request already sent', 409);
+      }
+      // Reverse pending → auto-accept.
       const { data: accepted, error } = await supabase
         .from('friendships')
         .update({ status: 'accepted' })
-        .eq('id', reverse.id)
+        .eq('id', existing.id)
         .select()
         .single();
       if (error) return apiError('DB_ERROR', error.message, 500);

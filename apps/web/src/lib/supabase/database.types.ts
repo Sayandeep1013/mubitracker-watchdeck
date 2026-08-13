@@ -14,6 +14,109 @@ export type Database = {
   }
   public: {
     Tables: {
+      deck_buckets: {
+        Row: {
+          created_at: string
+          filter_hash: string
+          id: string
+          items: Json
+          partial: boolean
+          reason: string | null
+          served_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          filter_hash: string
+          id?: string
+          items: Json
+          partial?: boolean
+          reason?: string | null
+          served_at?: string | null
+          status: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          filter_hash?: string
+          id?: string
+          items?: Json
+          partial?: boolean
+          reason?: string | null
+          served_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deck_buckets_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deck_build_locks: {
+        Row: {
+          acquired_at: string
+          filter_hash: string
+          user_id: string
+        }
+        Insert: {
+          acquired_at?: string
+          filter_hash: string
+          user_id: string
+        }
+        Update: {
+          acquired_at?: string
+          filter_hash?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deck_build_locks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deck_impressions: {
+        Row: {
+          media_id: string
+          shown_at: string
+          user_id: string
+        }
+        Insert: {
+          media_id: string
+          shown_at?: string
+          user_id: string
+        }
+        Update: {
+          media_id?: string
+          shown_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deck_impressions_media_id_fkey"
+            columns: ["media_id"]
+            isOneToOne: false
+            referencedRelation: "media"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deck_impressions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deck_sessions: {
         Row: {
           created_at: string
@@ -83,6 +186,7 @@ export type Database = {
       }
       friendships: {
         Row: {
+          blocked_by: string | null
           created_at: string
           id: string
           receiver_id: string
@@ -91,6 +195,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          blocked_by?: string | null
           created_at?: string
           id?: string
           receiver_id: string
@@ -99,6 +204,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          blocked_by?: string | null
           created_at?: string
           id?: string
           receiver_id?: string
@@ -107,6 +213,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "friendships_blocked_by_fkey"
+            columns: ["blocked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "friendships_receiver_id_fkey"
             columns: ["receiver_id"]
@@ -140,6 +253,7 @@ export type Database = {
       }
       media: {
         Row: {
+          adult: boolean
           backdrop_path: string | null
           classification: Database["public"]["Enums"]["media_classification"]
           created_at: string
@@ -154,9 +268,11 @@ export type Database = {
           runtime: number | null
           title: string
           updated_at: string
+          vote_count: number
           year: number | null
         }
         Insert: {
+          adult?: boolean
           backdrop_path?: string | null
           classification?: Database["public"]["Enums"]["media_classification"]
           created_at?: string
@@ -171,9 +287,11 @@ export type Database = {
           runtime?: number | null
           title: string
           updated_at?: string
+          vote_count?: number
           year?: number | null
         }
         Update: {
+          adult?: boolean
           backdrop_path?: string | null
           classification?: Database["public"]["Enums"]["media_classification"]
           created_at?: string
@@ -188,6 +306,7 @@ export type Database = {
           runtime?: number | null
           title?: string
           updated_at?: string
+          vote_count?: number
           year?: number | null
         }
         Relationships: []
@@ -250,6 +369,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      media_rejected: {
+        Row: {
+          external_id: string
+          provider: string
+          reason: string
+          rejected_at: string
+        }
+        Insert: {
+          external_id: string
+          provider: string
+          reason: string
+          rejected_at?: string
+        }
+        Update: {
+          external_id?: string
+          provider?: string
+          reason?: string
+          rejected_at?: string
+        }
+        Relationships: []
       }
       notifications: {
         Row: {
@@ -436,8 +576,10 @@ export type Database = {
       user_media: {
         Row: {
           created_at: string
+          hidden_until: string | null
           id: string
           media_id: string
+          reject_count: number
           review_status: string
           status: string
           updated_at: string
@@ -446,8 +588,10 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          hidden_until?: string | null
           id?: string
           media_id: string
+          reject_count?: number
           review_status?: string
           status: string
           updated_at?: string
@@ -456,8 +600,10 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          hidden_until?: string | null
           id?: string
           media_id?: string
+          reject_count?: number
           review_status?: string
           status?: string
           updated_at?: string
@@ -481,12 +627,68 @@ export type Database = {
           },
         ]
       }
+      user_taste: {
+        Row: {
+          computed_at: string
+          decision_count: number
+          user_id: string
+          vector: Json
+        }
+        Insert: {
+          computed_at?: string
+          decision_count: number
+          user_id: string
+          vector: Json
+        }
+        Update: {
+          computed_at?: string
+          decision_count?: number
+          user_id?: string
+          vector?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_taste_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      compute_user_taste: { Args: { p_user_id: string }; Returns: Json }
+      get_eligible_media: {
+        Args: {
+          p_classifications?: string[]
+          p_formats?: string[]
+          p_genre_ids?: number[]
+          p_languages?: string[]
+          p_limit?: number
+          p_user_id: string
+          p_year_from?: number
+          p_year_to?: number
+        }
+        Returns: {
+          backdrop_path: string
+          classification: string
+          format: string
+          genre_ids: number[]
+          id: string
+          original_language: string
+          original_title: string
+          overview: string
+          popularity: number
+          poster_path: string
+          runtime: number
+          title: string
+          year: number
+        }[]
+      }
     }
     Enums: {
       media_classification:

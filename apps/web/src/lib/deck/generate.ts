@@ -15,9 +15,26 @@ import {
   type WatchStatus,
 } from '@mubitracker/shared';
 import { tmdbDiscover } from '@/lib/tmdb/provider';
-import { upsertMediaBatch } from '@/lib/media/repository';
+import { asDbMedia, toMediaSummary, upsertMediaBatch } from '@/lib/media/repository';
 import { isHiddenNow } from '@/lib/deck/cooldown';
 import { getRecentImpressions, recordImpressions } from '@/lib/deck/impressions';
+import { friendshipPairFilter } from '@/lib/social/friends';
+
+/** Thrown by the friend-deck path for conditions that map to a specific
+ * HTTP status (spec 40 §5) rather than the generic 500 the route's catch
+ * block otherwise returns. */
+export class FriendAccessError extends Error {
+  constructor(
+    public status: number,
+    public code: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+const FRIEND_MODES = ['watched_not_me', 'watched', 'reviewed'] as const;
+type FriendMode = (typeof FRIEND_MODES)[number];
 
 export interface ParsedDeckFilters {
   format?: MediaFormat[];
@@ -189,16 +206,171 @@ function isEligible(
   return true;
 }
 
-async function getFriendWatchedIds(
+/** Spec 40 §5 rules 1-3: validates friend_mode + friendship acceptance +
+ * reviews visibility before any candidate query runs. */
+async function assertFriendAccess(
+  supabase: SupabaseClient,
+  userId: string,
+  friendId: string,
+  friendModeRaw: string | undefined,
+): Promise<FriendMode> {
+  if (friendModeRaw && !FRIEND_MODES.includes(friendModeRaw as FriendMode)) {
+    throw new FriendAccessError(400, 'BAD_REQUEST', `Unknown friend_mode: ${friendModeRaw}`);
+  }
+  const mode = (friendModeRaw as FriendMode | undefined) ?? 'watched_not_me';
+
+  const { data: friendship } = await supabase
+    .from('friendships')
+    .select('id')
+    .eq('status', 'accepted')
+    .or(friendshipPairFilter(userId, friendId))
+    .maybeSingle();
+  if (!friendship) {
+    throw new FriendAccessError(403, 'FORBIDDEN', 'Not friends with this user');
+  }
+
+  if (mode === 'reviewed') {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('reviews_visibility')
+      .eq('id', friendId)
+      .single();
+    // 'friends' visibility is satisfied by the accepted-friendship check
+    // above; only 'private' blocks an already-accepted friend.
+    if (profile?.reviews_visibility === 'private') {
+      throw new FriendAccessError(403, 'FORBIDDEN', "This user's reviews are private");
+    }
+  }
+
+  return mode;
+}
+
+/**
+ * Friend decks are a finite, known set — the friend's own watched list or
+ * reviewed titles — not a random slice of the global TMDB catalog. Querying
+ * it directly (rather than intersecting random discover pages, as before)
+ * is what makes Their Deck actually show the friend's titles instead of
+ * whichever ones happen to land on a randomly chosen page (spec 40 §5.4).
+ */
+async function getFriendCandidateMediaIds(
   supabase: SupabaseClient,
   friendId: string,
-): Promise<Set<string>> {
+  mode: FriendMode,
+): Promise<string[]> {
+  if (mode === 'reviewed') {
+    const { data } = await supabase
+      .from('reviews')
+      .select('media_id')
+      .eq('user_id', friendId)
+      .order('created_at', { ascending: false })
+      .order('media_id', { ascending: false });
+    return (data ?? []).map((r) => r.media_id);
+  }
+
   const { data } = await supabase
     .from('user_media')
     .select('media_id')
     .eq('user_id', friendId)
-    .eq('status', 'watched');
-  return new Set((data ?? []).map((r) => r.media_id));
+    .eq('status', 'watched')
+    .order('watched_at', { ascending: false, nullsFirst: false })
+    .order('media_id', { ascending: false });
+  return (data ?? []).map((r) => r.media_id);
+}
+
+/** `watched_not_me`/`reviewed`: "what have they seen/reviewed that I
+ * haven't?" — drop anything already in my own watched/watch_later.
+ * `watched` mode intentionally skips this (spec 40 §5: browse their whole
+ * watched list, including titles I've already seen). */
+async function excludeMyHistory(
+  supabase: SupabaseClient,
+  userId: string,
+  candidateIds: string[],
+): Promise<string[]> {
+  if (!candidateIds.length) return candidateIds;
+  const { data } = await supabase
+    .from('user_media')
+    .select('media_id')
+    .eq('user_id', userId)
+    .in('status', ['watched', 'watch_later'])
+    .in('media_id', candidateIds);
+  const mine = new Set((data ?? []).map((r) => r.media_id));
+  return candidateIds.filter((id) => !mine.has(id));
+}
+
+async function generateFriendDeck(
+  supabase: SupabaseClient,
+  userId: string,
+  filters: ParsedDeckFilters,
+  limit: number,
+  cursorRaw: string | null,
+  sessionId: string | undefined,
+): Promise<{ items: DeckItem[]; cursor: string | null; sessionId: string; message?: string }> {
+  const friendId = filters.friendId!;
+  const mode = await assertFriendAccess(supabase, userId, friendId, filters.friendMode);
+
+  let candidateIds = await getFriendCandidateMediaIds(supabase, friendId, mode);
+  if (mode !== 'watched') {
+    candidateIds = await excludeMyHistory(supabase, userId, candidateIds);
+  }
+
+  let session = sessionId;
+  if (!session) {
+    const { data } = await supabase
+      .from('deck_sessions')
+      .insert({ user_id: userId, filter_config: filters as unknown as Record<string, unknown> })
+      .select('id')
+      .single();
+    session = data?.id ?? crypto.randomUUID();
+  }
+
+  // The friend's candidate list is already fully known, so the cursor is
+  // just a page offset into it — no TMDB paging/exclusion-loop needed.
+  const cursor = decodeCursor(cursorRaw);
+  const page = cursor?.page ?? 1;
+  const offset = (page - 1) * limit;
+  const pageIds = candidateIds.slice(offset, offset + limit);
+
+  if (pageIds.length === 0) {
+    return {
+      items: [],
+      cursor: null,
+      sessionId: session!,
+      message:
+        candidateIds.length === 0
+          ? mode === 'reviewed'
+            ? "They haven't reviewed anything yet."
+            : "They haven't watched anything yet."
+          : "You've reached the end of their list.",
+    };
+  }
+
+  const [{ data: mediaRows }, stateMap] = await Promise.all([
+    supabase.from('media').select('*').in('id', pageIds),
+    getUserMediaState(supabase, userId, pageIds),
+  ]);
+  const byId = new Map((mediaRows ?? []).map((m) => [m.id, m]));
+
+  const items: DeckItem[] = pageIds
+    .map((id) => byId.get(id))
+    .filter((m): m is NonNullable<typeof m> => Boolean(m))
+    .map((row) => {
+      const summary = toMediaSummary(asDbMedia(row));
+      const state = stateMap.get(row.id);
+      return {
+        ...summary,
+        userStatus: state?.status,
+        userReviewStatus: state?.reviewStatus,
+        userRejectCount: state?.rejectCount ?? 0,
+        userHiddenUntil: state?.hiddenUntil ?? null,
+      };
+    });
+
+  const hasMore = offset + limit < candidateIds.length;
+  const nextCursor = hasMore
+    ? encodeCursor({ page: page + 1, format: 'movie', sessionId: session! })
+    : null;
+
+  return { items, cursor: nextCursor, sessionId: session! };
 }
 
 export interface DeckCursor {
@@ -228,10 +400,8 @@ export async function generateDeck(
   cursorRaw: string | null,
   sessionId?: string,
 ): Promise<{ items: DeckItem[]; cursor: string | null; sessionId: string; message?: string }> {
-  let friendWatchedIds: Set<string> | null = null;
-
   if (filters.friendId) {
-    friendWatchedIds = await getFriendWatchedIds(supabase, filters.friendId);
+    return generateFriendDeck(supabase, userId, filters, limit, cursorRaw, sessionId);
   }
 
   let session = sessionId;
@@ -282,12 +452,6 @@ export async function generateDeck(
       if (!isEligible(state, filters, impressed.has(media.id))) continue;
       if (filters.reviewStatus?.includes('pending') && state?.reviewStatus !== 'pending') continue;
       candidatesEligible++;
-
-      if (friendWatchedIds) {
-        if (filters.friendMode === 'watched_not_me' && !friendWatchedIds.has(media.id)) continue;
-        if (filters.friendMode === 'watched' && !friendWatchedIds.has(media.id)) continue;
-        if (!filters.friendMode && !friendWatchedIds.has(media.id)) continue;
-      }
 
       shownIds.add(media.id);
       items.push({

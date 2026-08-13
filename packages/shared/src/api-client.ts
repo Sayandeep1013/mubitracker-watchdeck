@@ -189,6 +189,10 @@ export class MubitrackerClient {
     return this.fetch(`/api/v1/friends/${id}/block`, { method: 'POST' });
   }
 
+  unblockFriend(id: string) {
+    return this.fetch(`/api/v1/friends/${id}/block`, { method: 'DELETE' });
+  }
+
   getNotifications(unread = false) {
     return this.fetch<{
       unreadCount: number;

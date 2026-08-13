@@ -8,11 +8,12 @@ interface Friendship {
   requesterId: string;
   receiverId: string;
   status: string;
+  blockedBy?: string | null;
   direction?: string;
   friend?: { id: string; username: string };
 }
 
-type Tab = 'friends' | 'incoming' | 'outgoing';
+type Tab = 'friends' | 'incoming' | 'outgoing' | 'blocked';
 
 export default function FriendsPage() {
   const client = useApiClient();
@@ -20,6 +21,8 @@ export default function FriendsPage() {
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [incoming, setIncoming] = useState<Friendship[]>([]);
   const [outgoing, setOutgoing] = useState<Friendship[]>([]);
+  const [blocked, setBlocked] = useState<Friendship[]>([]);
+  const [myId, setMyId] = useState<string | null>(null);
   const [username, setUsername] = useState('');
   const [searchQ, setSearchQ] = useState('');
   const [searchHits, setSearchHits] = useState<{ id: string; username: string }[]>([]);
@@ -31,19 +34,25 @@ export default function FriendsPage() {
   } | null>(null);
 
   const load = useCallback(async () => {
-    const [a, i, o] = await Promise.all([
+    const [a, i, o, b] = await Promise.all([
       client.getFriends('accepted'),
       client.getFriends('pending_in'),
       client.getFriends('pending_out'),
+      client.getFriends('blocked'),
     ]);
     setFriends(a as Friendship[]);
     setIncoming(i as Friendship[]);
     setOutgoing(o as Friendship[]);
+    setBlocked(b as Friendship[]);
   }, [client]);
 
   useEffect(() => {
     load().catch(() => setError('Failed to load friends'));
-  }, [load]);
+    client
+      .getProfile()
+      .then((p) => setMyId(p.id))
+      .catch(() => {});
+  }, [load, client]);
 
   useEffect(() => {
     if (searchQ.trim().length < 2) {
@@ -138,6 +147,7 @@ export default function FriendsPage() {
             ['friends', 'Friends'],
             ['incoming', `Incoming${incoming.length ? ` (${incoming.length})` : ''}`],
             ['outgoing', 'Outgoing'],
+            ['blocked', 'Blocked'],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -227,6 +237,37 @@ export default function FriendsPage() {
                 >
                   Cancel
                 </button>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      {tab === 'blocked' && (
+        <div className="space-y-2">
+          {blocked.length === 0 ? (
+            <p className="text-sm text-neutral-600">No blocked users</p>
+          ) : (
+            blocked.map((f) => (
+              <div
+                key={f.id}
+                className="flex items-center justify-between rounded-xl border border-neutral-800 px-3 py-3"
+              >
+                <p className="text-sm text-neutral-300">@{f.friend?.username ?? 'Unknown'}</p>
+                {f.blockedBy === myId ? (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await client.unblockFriend(f.id);
+                      load();
+                    }}
+                    className="rounded border border-neutral-700 px-2 py-1 text-xs"
+                  >
+                    Unblock
+                  </button>
+                ) : (
+                  <span className="text-xs text-neutral-600">Blocked you</span>
+                )}
               </div>
             ))
           )}
