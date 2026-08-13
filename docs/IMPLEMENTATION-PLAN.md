@@ -149,11 +149,16 @@ Spec [`40`](spec/40-friends-v2.md). Requires Stage 3 tokens for consistency.
 - [ ] **4.4 Mobile Watch Later** — no gesture, action, screen, or tab.
 - [ ] **4.5 Mobile undo depth 1 → 20** to match web.
 - [ ] **4.6 Web mobile-breakpoint nav** — bottom bar renders `links.slice(0,5)`, so Friends/Profile/bell are unreachable under `md`.
-- [ ] **4.7 `friendMode` semantics** — `watched_not_me`, `watched`, unset all collapse to one predicate; `reviewed` unhandled.
-- [ ] **4.8 Unblock route** — block is currently irreversible.
-- [ ] **4.9 Reverse-accepted duplicate guard** — B can re-request A after acceptance, creating a second row.
+- [x] **4.7 `friendMode` semantics** — `watched_not_me`, `watched`, unset all collapse to one predicate; `reviewed` unhandled.
+  > Rewritten to source candidates directly from the friend's own `user_media`/`reviews` (stable pagination) instead of intersecting random TMDB discover pages with the friend's watched set — the latter made "Their Deck" thin/empty in practice. Verified live against production DB with a 3-account scenario covering all three modes, pagination, and access errors.
+- [x] **4.8 Unblock route** — block is currently irreversible.
+  > `DELETE /api/v1/friends/[id]/block`, restricted to whoever placed the block (`blocked_by` column). Verified live: non-blocker unblock 403s, blocker unblock 200s + deletes row, second unblock 404s, either side can re-request after unblock.
+- [x] **4.9 Reverse-accepted duplicate guard** — B can re-request A after acceptance, creating a second row.
+  > POST now loads any existing row for the pair and branches on status (`accepted`→409, pending same-direction→409, pending reverse→auto-accept, `blocked`→403); backed by a unique index across both directions. Verified live.
 - [ ] **4.10 Mobile `/about`** — TMDB attribution missing on mobile (licensing gap).
 - [ ] **4.11 Mobile SecureStore** — session is in `AsyncStorage`; spec 08 requires `expo-secure-store` (installed, unused).
+- [ ] **4.12 Web `/reviews` list screen** — spec [`32`](spec/32-web-ux.md) §4 (Written/Pending tabs). Scoped into spec 32 but not covered by Stage 3.8 or any other 4.x item; folded in here per the gap flagged in `HANDOFF.md` rather than left untracked.
+- [ ] **4.13 Notifications alignment** — spec [`40`](spec/40-friends-v2.md) §7 (endpoint path, read-timing, toast actions, badge parity across web/mobile). Scoped into spec 40 but not an original 4.1-4.11 item; same gap pattern as 4.12.
 
 ---
 

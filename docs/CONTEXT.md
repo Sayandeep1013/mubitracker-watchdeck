@@ -98,7 +98,12 @@ Username + password only. Under the hood, Supabase Auth with a **synthetic email
 - `review-later/[id]/page.tsx` now shows the title/poster of the media being reviewed; `review-later/page.tsx`'s empty state correctly says "press ↓" (was ↑).
 - Collection's status chips were already correctly capitalized (`All / Watched / Unwatched`) — the audit's fix-list entry for this was stale; confirmed by reading the code, not re-fixed.
 
-**Known gap, not yet resolved:** spec 32 §4 (a `/reviews` list screen with Written/Pending tabs, editing, deleting) and §6 (mobile-web bottom-nav `More` sheet for Friends/Profile/Notifications) are both explicitly in spec 32's scope but appear in neither `IMPLEMENTATION-PLAN.md`'s Stage 3.8 line nor anywhere in Stage 4 — they were never actually assigned a plan item. Needs a decision: fold into Stage 4, or add as a new plan item.
+*Added in Stage 4.7-4.9 (`2026-08-13`) — friends backend fixes, spec [`40`](spec/40-friends-v2.md), verified live against production DB:*
+- ~~`friendMode` semantics all collapsed to one predicate; `reviewed` unhandled~~ — `generateFriendDeck` now queries the friend's own `user_media`/`reviews` directly (stable offset pagination) instead of intersecting random TMDB discover pages with their watched set, which is also what was making "Their Deck" thin/empty in practice. All three modes (`watched_not_me`/`watched`/`reviewed`) implemented and access-checked (`FriendAccessError` → 400/403).
+- ~~Block was irreversible~~ — `blocked_by` column + `DELETE /api/v1/friends/[id]/block`, restricted to whoever placed the block. Web `friends/page.tsx` gained a Blocked tab with Unblock.
+- ~~B could re-request A after A already accepted, creating a duplicate row~~ — POST now branches on the existing row's status (`accepted`→409, pending-same-direction→409, pending-reverse→auto-accept, `blocked`→403); backed by a unique index across both directions of the pair.
+
+**Known gap — resolved by explicit plan items, not yet implemented:** spec 32 §4 (a `/reviews` list screen with Written/Pending tabs) and spec 40 §7 (notifications alignment) were both scoped into their specs but absent from `IMPLEMENTATION-PLAN.md`. §6 (mobile-web bottom-nav `More` sheet) is covered by existing item 4.6. §4 and §7 are now explicit items **4.12** and **4.13** in Stage 4, rather than left as untracked prose gaps.
 
 *Fixed in Stage 1 (`2026-08-13`):*
 - ~~Series genre coverage 46%~~ — TV genre ids seeded, per-row genre-link inserts (one bad FK no longer drops a title's whole genre set), 236 genre-less rows backfilled from TMDB. **99.6% series / 99.7% movie coverage**, verified live.

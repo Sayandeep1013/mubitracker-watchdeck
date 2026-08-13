@@ -10,51 +10,57 @@ Read after [`CONTEXT.md`](CONTEXT.md). Then work [`IMPLEMENTATION-PLAN.md`](IMPL
 ```
 Read docs/CONTEXT.md, docs/HANDOFF.md, and docs/IMPLEMENTATION-PLAN.md.
 
-Stages 0-1, all of Stage 2 (2.1-2.7), and all of Stage 3 (3.1-3.8) are
-done. Stage 2 is the entire deck-engine v2 rewrite (cooldown/exclusion,
-taste model, corpus ingestion, bucket service, background pre-build,
-both clients wired) — it ships behind `DECK_ENGINE=v2`, which is NOT set
-in Vercel, so production is still v1, unaffected, byte-for-byte the same
-behavior it had before this session. Stage 3 is the UX feedback layer on
-both clients (theme tokens, deck animations/gestures/fallback buttons,
-toast, safe areas/keyboard, accessibility, per-screen loading/empty/error
-states, plus web-side polish: deck skeleton+retry, review editor title,
-self-hosted TMDB logo, import error messages, and a real bug fix — web's
-`review_later` was animating the card upward instead of downward).
+Stages 0-1, all of Stage 2 (2.1-2.7), all of Stage 3 (3.1-3.8), and
+Stage 4's backend trio (4.7-4.9) are done. Stage 2 is the entire
+deck-engine v2 rewrite — it ships behind `DECK_ENGINE=v2`, which is NOT
+set in Vercel, so production is still v1, unaffected. Stage 3 is the UX
+feedback layer on both clients. Stage 4.7-4.9 are the friends-system
+backend fixes: friend-deck mode semantics (candidates now come from the
+friend's own `user_media`/`reviews` directly, not random TMDB pages
+intersected with their watched set), an unblock route, and a
+reverse-accepted duplicate-request guard.
 
-Web's Stage 3.8 work was verified in a real headless Playwright browser
-(see Session Log for exact checks) — trust it. **Mobile's Stage 3.1-3.7
+Web's Stage 3.8 and Stage 4.7-4.9 work was verified live (headless
+Playwright for 3.8; direct API calls with throwaway test accounts
+against production DB for 4.7-4.9) — trust it. **Mobile's Stage 3.1-3.7
 was NOT** — no Android device was connected this session, so it's
 typecheck-clean and code-reviewed by hand only, left at `[~]` in the
 plan. Treat it as a real risk area, not "done," until it's actually run
-on a device.
+on a device. The same no-device caveat will apply to the mobile-only
+items still ahead in Stage 4 (4.2, 4.3, 4.4, 4.5, 4.10, 4.11) — implement
+them theoretically (code-complete + typecheck-verified), add a Maestro
+flow stub or explicit note for later verification, and move on. Do not
+attempt manual/simulated device testing with no device connected.
 
 Two things are explicitly waiting on the user, not on you:
 1. **Stage 2.8** (flip `DECK_ENGINE=v2` in Vercel) — user-visible
    production change, needs a direct go-ahead first. Don't flip it
    unprompted even if everything else looks green.
-2. **Stage 3.1-3.7 device verification** — if my Android device is
+2. **Stage 3.1-3.7 device verification** — if an Android device is
    connected (check: adb devices), manually run through the deck's
    gestures/buttons, toast, keyboard handling, and each screen's
    loading/empty/error states before promoting any of `[~]` 3.1-3.7 to
-   `[x]`. No Maestro flows exist for these yet (Stage 0's flows don't
-   cover Stage 3's new UI) — write them if you have device access, or do
-   a manual pass and note in the Session Log exactly what you checked.
+   `[x]`. Maestro flows exist for some of it (`mobile-qa/flows/`,
+   see the README status table) but are themselves unrun.
 
-Continue with **Stage 4** (friends/filters/Watch Later parity on
-mobile, spec 40) — independent of 2.8, can start regardless of whether
-the flag has been flipped yet. Note that spec 32 §4 (a new `/reviews`
-list screen with Written/Pending tabs) and §6 (mobile-web bottom-nav
-`More` sheet) and §8 (privacy settings UI, already Stage 4.1) were
-scoped INTO spec 32 but are NOT covered by IMPLEMENTATION-PLAN.md's
-Stage 3.8 line or by this session's work — they're a gap between the
-spec and the plan, not something silently skipped. Flag this to the
-user once, then either fold them into Stage 4 or add a Stage 3.9 if
-they want it tracked explicitly.
+Continue with the rest of **Stage 4**: 4.1 (privacy settings UI, web +
+mobile), 4.2 (mobile friends UI — the largest remaining item), 4.3
+(mobile filters/presets), 4.4 (mobile Watch Later screen), 4.5 (mobile
+undo depth), 4.6 (web mobile-breakpoint nav — this also closes the
+spec-32 §6 gap flagged last session), 4.10 (mobile /about), 4.11
+(mobile SecureStore). Two more items were added this session to close
+gaps flagged but not folded in last time: **4.12** (web `/reviews` list
+screen, spec 32 §4) and **4.13** (notifications alignment, spec 40 §7)
+— both were scoped into their specs but absent from the original 4.1-4.11
+list, so per last session's own note ("fold them into Stage 4 ... if
+they want it tracked explicitly") they're now explicit checklist items
+rather than left as prose gaps.
 
 For each item: implement → pnpm typecheck → write/extend its test →
-verify against the acceptance criterion → commit → update the checkbox
-in IMPLEMENTATION-PLAN.md → append to the Session Log in HANDOFF.md.
+verify against the acceptance criterion (or, for mobile-only items with
+no device available, verify via typecheck + code review and record the
+pending test explicitly) → commit → update the checkbox in
+IMPLEMENTATION-PLAN.md → append to the Session Log in HANDOFF.md.
 
 There is no staging Supabase yet (Stage 5.5) — migrations and verification
 queries run directly against production. Use the Supabase MCP for
@@ -67,7 +73,7 @@ When you finish a stage, update this prompt block and tell me what
 changed.
 ```
 
-**Current position: Stage 1, all of Stage 2 (2.1-2.7), and all of Stage 3 (3.1-3.8) shipped (`2026-08-13`). Deck v2 is behind `DECK_ENGINE=v2` (unset in prod — v1 still serves production unchanged); Stage 2.8 needs the user's go-ahead before flipping the flag. Stage 3.8 (web) is `[x]`, verified in a real headless browser. Stage 3.1-3.7 (mobile) is `[~]` — code-complete/typecheck-clean but no Android device this session, so it's unverified on-device. Next up: Stage 4 (friends/filters/Watch Later parity on mobile) — see the gap note above about spec 32 §4/§6 first.**
+**Current position: Stage 1, all of Stage 2 (2.1-2.7), all of Stage 3 (3.1-3.8), and Stage 4.7-4.9 shipped (`2026-08-13`). Deck v2 is behind `DECK_ENGINE=v2` (unset in prod); Stage 2.8 needs the user's go-ahead before flipping the flag. Stage 3.8 and 4.7-4.9 are `[x]`, verified live. Stage 3.1-3.7 (mobile) is `[~]` — code-complete/typecheck-clean but no Android device this session. Next up: the rest of Stage 4 (4.1-4.6, 4.10-4.13) — mobile-only items to be implemented theoretically per the no-device policy, with pending tests recorded for later.**
 
 ### Pending verification
 
@@ -111,6 +117,18 @@ This is the mechanism that lets a session run without the user in the loop. Foll
 ## Session Log
 
 Newest first. One line per completed item; a block per stage.
+
+### 2026-08-13 — Stage 4.7-4.9 (friend-deck modes, unblock, duplicate-request guard) — `5b77a2c`
+
+Spec [`40`](spec/40-friends-v2.md). First slice of Stage 4 — the three backend items that don't depend on any new mobile UI.
+
+| Item | Change |
+|---|---|
+| 4.7 `friendMode` semantics | `generate.ts`'s `generateFriendDeck` no longer routes friend requests through the TMDB-discover loop at all — that loop intersected randomly-paged TMDB results with the friend's watched-id set, so a friend's title only surfaced if it happened to land on a randomly chosen page, making "Their Deck" thin or empty in practice even for a friend with a full watch history. Rewritten to query the friend's own `user_media` (mode `watched`/`watched_not_me`) or `reviews` (mode `reviewed`) directly, ordered stably (`watched_at`/`created_at` desc, `media_id` desc as tiebreak) and paginated by offset — no TMDB call in the friend-deck path at all now. New `assertFriendAccess` throws a typed `FriendAccessError` (400 unknown mode, 403 no accepted friendship, 403 `reviewed` mode against a friend whose `reviews_visibility` is private), caught in `deck/route.ts` before the generic 500 fallback. `excludeMyHistory` filters out anything the viewer has already watched/queued, applied to `watched_not_me`/`reviewed` but not `watched`. |
+| 4.8 Unblock route | Block was previously irreversible — no DELETE existed. Added a `blocked_by uuid references profiles(id)` column (migration `20260813000010`), set on block; new `DELETE /api/v1/friends/[id]/block` 404s if the row isn't `status='blocked'`, 403s if the caller isn't `blocked_by`, otherwise deletes the row. `unblockFriend()` added to the shared API client; `friends/page.tsx` gained a Blocked tab showing an Unblock button (only when the viewer placed the block) or "Blocked you" otherwise. |
+| 4.9 Reverse-accepted duplicate guard | POST `/api/v1/friends` previously ran separate ad-hoc checks (blocked? reverse-pending?) that didn't cover the already-`accepted` case, so B could re-send a request to A after A had already accepted B's original one, creating a second row for the same pair. Rewritten to load any existing row for the pair first and branch on its status: `accepted`→409 `ALREADY_FRIENDS`, pending same-direction→409 `REQUEST_PENDING`, pending reverse-direction→auto-accept (unchanged prior behavior), `blocked`→403. Backed by migration `20260813000009`: a dedup pass (0 duplicates found live) plus `CREATE UNIQUE INDEX ... ON friendships (LEAST(requester_id,receiver_id), GREATEST(requester_id,receiver_id))`, so the invariant holds at the DB layer too, not just in application logic. |
+
+**Verified live** against production DB with throwaway `wqa*` accounts (scripts written ad-hoc, deleted after use — same pattern as Stage 3.8's Playwright scripts): a 3-account scenario (A/B/C) covering — C (not A's friend) gets 403 on A's deck; A→B request, B accepts; B→A request post-acceptance gets 409 `ALREADY_FRIENDS`; unknown `friend_mode` gets 400; `watched_not_me` correctly excludes a title B also watched; `watched` mode includes it; unset `friend_mode` matches `watched_not_me`'s count; `reviewed` returns only the reviewed title; a 2-item page + cursor produces a non-overlapping second page. A separate 2-account scenario for block/unblock: non-blocker unblock attempt → 403; blocked party re-requesting → 403; blocker unblocks → 200 + row deleted; second unblock attempt → 404; either side can send a fresh request after unblock → 201. All assertions passed on both runs. `pnpm typecheck` clean.
 
 ### 2026-08-13 — Stage 3.8 (web polish)
 
