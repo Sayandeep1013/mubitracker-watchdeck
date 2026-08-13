@@ -67,6 +67,8 @@ export const undoSchema = z.object({
   media_id: z.string().uuid(),
   previous_status: z.enum(['watched', 'unwatched', 'watch_later']),
   previous_review_status: z.enum(['none', 'pending', 'written']),
+  previous_reject_count: z.number().int().min(0).optional().default(0),
+  previous_hidden_until: z.string().nullable().optional().default(null),
 });
 
 export const importSchema = z.object({

@@ -71,6 +71,8 @@ export interface UndoAction {
   mediaId: string;
   previousStatus: WatchStatus;
   previousReviewStatus: ReviewStatus;
+  previousRejectCount: number;
+  previousHiddenUntil: string | null;
   timestamp: string;
 }
 

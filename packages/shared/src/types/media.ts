@@ -18,6 +18,8 @@ export interface MediaSummary {
 export interface DeckItem extends MediaSummary {
   userStatus?: WatchStatus;
   userReviewStatus?: ReviewStatus;
+  userRejectCount?: number;
+  userHiddenUntil?: string | null;
 }
 
 export interface NormalizedMedia {

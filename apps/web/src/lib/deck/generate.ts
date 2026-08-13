@@ -16,6 +16,10 @@ import {
 } from '@mubitracker/shared';
 import { tmdbDiscover } from '@/lib/tmdb/provider';
 import { upsertMediaBatch } from '@/lib/media/repository';
+import { isHiddenNow } from '@/lib/deck/cooldown';
+
+const IMPRESSION_SUPPRESS_MS = 24 * 60 * 60 * 1000;
+const IMPRESSION_PRUNE_MS = 30 * 24 * 60 * 60 * 1000;
 
 export interface ParsedDeckFilters {
   format?: MediaFormat[];
@@ -126,16 +130,80 @@ function matchesFormat(format: MediaFormat, filters?: MediaFormat[]): boolean {
   return filters.includes(format);
 }
 
-async function getExcludedMediaIds(
+interface UserMediaState {
+  status: WatchStatus;
+  reviewStatus: ReviewStatus;
+  rejectCount: number;
+  hiddenUntil: string | null;
+}
+
+/**
+ * Exclusion is evaluated as a scoped lookup against only the current page's
+ * candidate ids (spec 24 §7), never as a single unbounded fetch of the
+ * user's whole history — that was the v1 bug: PostgREST caps rows at 1,000,
+ * so past 1,000 watched/watch_later items the in-memory Set silently
+ * truncated and watched titles started reappearing.
+ */
+async function getUserMediaState(
   supabase: SupabaseClient,
   userId: string,
-): Promise<Set<string>> {
+  mediaIds: string[],
+): Promise<Map<string, UserMediaState>> {
+  if (!mediaIds.length) return new Map();
+
   const { data } = await supabase
     .from('user_media')
+    .select('media_id, status, review_status, reject_count, hidden_until')
+    .eq('user_id', userId)
+    .in('media_id', mediaIds);
+
+  return new Map(
+    (data ?? []).map((r) => [
+      r.media_id,
+      {
+        status: r.status as WatchStatus,
+        reviewStatus: r.review_status as ReviewStatus,
+        rejectCount: r.reject_count ?? 0,
+        hiddenUntil: r.hidden_until,
+      },
+    ]),
+  );
+}
+
+async function getRecentImpressions(
+  supabase: SupabaseClient,
+  userId: string,
+  mediaIds: string[],
+): Promise<Set<string>> {
+  if (!mediaIds.length) return new Set();
+  const { data } = await supabase
+    .from('deck_impressions')
     .select('media_id')
     .eq('user_id', userId)
-    .in('status', ['watched', 'watch_later']);
+    .in('media_id', mediaIds)
+    .gt('shown_at', new Date(Date.now() - IMPRESSION_SUPPRESS_MS).toISOString());
   return new Set((data ?? []).map((r) => r.media_id));
+}
+
+/** Explicit status filters override cooldown — the user is asking to see
+ * exactly those titles (spec 24 §8). Impression suppression is not a
+ * rejection signal, so it is never overridden by a status filter. */
+function isEligible(
+  state: UserMediaState | undefined,
+  filters: ParsedDeckFilters,
+  recentlyImpressed: boolean,
+): boolean {
+  if (recentlyImpressed) return false;
+  if (!state) return true;
+
+  const wantsWatched = filters.status?.includes('watched') ?? false;
+  const wantsWatchLater = filters.status?.includes('watch_later') ?? false;
+  const wantsUnwatched = filters.status?.includes('unwatched') ?? false;
+
+  if (state.status === 'watched') return wantsWatched;
+  if (state.status === 'watch_later') return wantsWatchLater;
+  if (state.status === 'unwatched' && isHiddenNow(state.hiddenUntil)) return wantsUnwatched;
+  return true;
 }
 
 async function getFriendWatchedIds(
@@ -150,54 +218,26 @@ async function getFriendWatchedIds(
   return new Set((data ?? []).map((r) => r.media_id));
 }
 
-async function getUserMediaStatusMap(
+async function recordImpressions(
   supabase: SupabaseClient,
   userId: string,
   mediaIds: string[],
-): Promise<Map<string, { status: WatchStatus; reviewStatus: ReviewStatus }>> {
-  if (!mediaIds.length) return new Map();
-
-  const { data } = await supabase
-    .from('user_media')
-    .select('media_id, status, review_status')
+): Promise<void> {
+  if (!mediaIds.length) return;
+  const now = new Date().toISOString();
+  await supabase
+    .from('deck_impressions')
+    .upsert(
+      mediaIds.map((mediaId) => ({ user_id: userId, media_id: mediaId, shown_at: now })),
+      { onConflict: 'user_id,media_id' },
+    );
+  // Opportunistic prune — keeps the table bounded without a cron (Stage 5).
+  // Safe alongside the write above: it only targets rows older than 30 days.
+  await supabase
+    .from('deck_impressions')
+    .delete()
     .eq('user_id', userId)
-    .in('media_id', mediaIds);
-
-  return new Map(
-    (data ?? []).map((r) => [
-      r.media_id,
-      { status: r.status as WatchStatus, reviewStatus: r.review_status as ReviewStatus },
-    ]),
-  );
-}
-
-function filterByUserStatus(
-  mediaIds: string[],
-  statusMap: Map<string, { status: WatchStatus; reviewStatus: ReviewStatus }>,
-  filters: ParsedDeckFilters,
-): string[] {
-  const wantsWatched = filters.status?.includes('watched') ?? false;
-  const wantsUnwatched = filters.status?.includes('unwatched') ?? false;
-
-  return mediaIds.filter((id) => {
-    const um = statusMap.get(id);
-    const isWatched = um?.status === 'watched';
-
-    // Both chips selected → status is not a filtering criterion (union, not AND).
-    if (wantsWatched && wantsUnwatched) {
-      // no-op
-    } else if (wantsUnwatched && isWatched) {
-      return false;
-    } else if (wantsWatched && !isWatched) {
-      return false;
-    } else if (!wantsWatched && !wantsUnwatched && isWatched) {
-      return false;
-    }
-
-    if (filters.reviewStatus?.includes('pending') && um?.reviewStatus !== 'pending') return false;
-
-    return true;
-  });
+    .lt('shown_at', new Date(Date.now() - IMPRESSION_PRUNE_MS).toISOString());
 }
 
 export interface DeckCursor {
@@ -227,7 +267,6 @@ export async function generateDeck(
   cursorRaw: string | null,
   sessionId?: string,
 ): Promise<{ items: DeckItem[]; cursor: string | null; sessionId: string; message?: string }> {
-  const watchedIds = await getExcludedMediaIds(supabase, userId);
   let friendWatchedIds: Set<string> | null = null;
 
   if (filters.friendId) {
@@ -253,6 +292,8 @@ export async function generateDeck(
   const items: DeckItem[] = [];
   const shownIds = new Set<string>();
   let attempts = 0;
+  let candidatesConsidered = 0;
+  let candidatesEligible = 0;
   const maxPages =
     filters.classification?.length || filters.genreNames?.length || filters.language?.length
       ? MAX_TMDB_PAGES_FILTERED
@@ -264,11 +305,22 @@ export async function generateDeck(
     const discovered = await tmdbDiscover(format, page, tmdbParams);
     const upserted = await upsertMediaBatch(supabase, discovered);
 
+    const pageIds = upserted.map((m) => m.id);
+    const [stateMap, impressed] = await Promise.all([
+      getUserMediaState(supabase, userId, pageIds),
+      getRecentImpressions(supabase, userId, pageIds),
+    ]);
+
     for (const media of upserted) {
       if (shownIds.has(media.id)) continue;
-      if (watchedIds.has(media.id) && !filters.status?.includes('watched') && !filters.status?.includes('watch_later')) continue;
       if (!matchesFormat(media.format, filters.format)) continue;
       if (!matchesClassification(media.classification, filters.classification)) continue;
+
+      candidatesConsidered++;
+      const state = stateMap.get(media.id);
+      if (!isEligible(state, filters, impressed.has(media.id))) continue;
+      if (filters.reviewStatus?.includes('pending') && state?.reviewStatus !== 'pending') continue;
+      candidatesEligible++;
 
       if (friendWatchedIds) {
         if (filters.friendMode === 'watched_not_me' && !friendWatchedIds.has(media.id)) continue;
@@ -277,7 +329,13 @@ export async function generateDeck(
       }
 
       shownIds.add(media.id);
-      items.push({ ...media });
+      items.push({
+        ...media,
+        userStatus: state?.status,
+        userReviewStatus: state?.reviewStatus,
+        userRejectCount: state?.rejectCount ?? 0,
+        userHiddenUntil: state?.hiddenUntil ?? null,
+      });
       if (items.length >= limit) break;
     }
 
@@ -290,23 +348,15 @@ export async function generateDeck(
     }
   }
 
-  const statusMap = await getUserMediaStatusMap(
-    supabase,
-    userId,
-    items.map((i) => i.id),
-  );
-
-  let filteredIds = items.map((i) => i.id);
-  if (filters.status?.length || filters.reviewStatus?.length) {
-    filteredIds = filterByUserStatus(filteredIds, statusMap, filters);
+  // Early signal that a user is exhausting the corpus (spec 24 §9) — exactly
+  // the condition v1 hit silently once ~400 titles were exhausted.
+  if (candidatesConsidered > 0 && candidatesEligible < limit * 2) {
+    console.warn(
+      `[deck] low eligible pool user=${userId} eligible=${candidatesEligible} considered=${candidatesConsidered} limit=${limit}`,
+    );
   }
 
-  const finalItems = items
-    .filter((i) => filteredIds.includes(i.id))
-    .map((i) => {
-      const um = statusMap.get(i.id);
-      return { ...i, userStatus: um?.status, userReviewStatus: um?.reviewStatus };
-    });
+  const finalItems = items;
 
   if (filters.sort === 'random') {
     for (let i = finalItems.length - 1; i > 0; i--) {
@@ -315,13 +365,18 @@ export async function generateDeck(
     }
   }
 
+  const served = finalItems.slice(0, limit);
+  if (served.length > 0) {
+    await recordImpressions(supabase, userId, served.map((i) => i.id));
+  }
+
   const nextCursor =
     finalItems.length >= limit
       ? encodeCursor({ page, format, sessionId: session! })
       : null;
 
   return {
-    items: finalItems.slice(0, limit),
+    items: served,
     cursor: nextCursor,
     sessionId: session!,
     message:

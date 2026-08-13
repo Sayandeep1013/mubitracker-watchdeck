@@ -18,6 +18,8 @@ interface LastAction {
   title: string;
   previousStatus: WatchStatus;
   previousReviewStatus: ReviewStatus;
+  previousRejectCount: number;
+  previousHiddenUntil: string | null;
 }
 
 export default function DeckScreen() {
@@ -88,6 +90,8 @@ export default function DeckScreen() {
       title: current.title,
       previousStatus: prevStatus,
       previousReviewStatus: prevReview,
+      previousRejectCount: current.userRejectCount ?? 0,
+      previousHiddenUntil: current.userHiddenUntil ?? null,
     });
     setIndex((i) => i + 1);
     try {
@@ -132,6 +136,8 @@ export default function DeckScreen() {
         media_id: lastAction.mediaId,
         previous_status: lastAction.previousStatus,
         previous_review_status: lastAction.previousReviewStatus,
+        previous_reject_count: lastAction.previousRejectCount,
+        previous_hidden_until: lastAction.previousHiddenUntil,
       });
     } catch {
       await enqueueOfflineAction({

@@ -56,11 +56,17 @@ Username + password only. Under the hood, Supabase Auth with a **synthetic email
 
 **Known broken** — full list with evidence in [`AUDIT-2026-08-12.md`](AUDIT-2026-08-12.md). Status as of Stage 1 (`2026-08-13`):
 
-*Still broken — Stage 2 on:*
-- The deck engine can only reach **~400 titles**; a heavy account (283 tracked) has effectively exhausted it. (Stage 2.4 corpus ingestion.)
-- Swiping left (**"haven't watched"**) has **no effect** — those titles are never excluded. (Stage 2.1 cooldown/exclusion.)
+*Still broken — Stage 2.3 on:*
+- The deck engine can only reach **~400 titles**; a heavy account (283 tracked) has effectively exhausted it. (Stage 2.4 corpus ingestion — candidates still come from live TMDB discover, not a queryable local corpus, until then.)
 - One under-filled batch **permanently kills** the deck (null cursor → clients stop prefetching). (Stage 2.5–2.7 bucket service.)
 - Mobile has **no friends UI at all**, no filters, no Watch Later, gesture-only actions, zero accessibility labels. (Stages 3–4.)
+
+*Fixed in Stage 2.1/2.2 (`2026-08-13`):*
+- ~~Swiping left had no effect~~ — `user_media.reject_count`/`hidden_until` + `deck_impressions` (spec 24). First reject hides 14d, second 60d, third+ forever; watched/watch_later hide forever; a served-but-unacted title is suppressed 24h. Verified live: escalation sequence, undo restoring exact prior `reject_count`/`hidden_until`, and a watched title never reappearing across 4 consecutive batches.
+- ~~In-memory exclusion `Set` with no `.limit()`~~ (silently truncated past 1,000 PostgREST rows, so watched titles could reappear for heavy accounts) — replaced with a per-page scoped lookup against only that page's candidate ids. No unbounded fetch exists in the deck path anymore.
+- Undo (`POST /api/v1/user-media/undo`) now carries and restores `previous_reject_count`/`previous_hidden_until` — both clients capture them from the deck item at swipe time.
+
+*Known limitation carried into 2.1 (not a defect, will resolve itself in 2.5):* candidates still come from live, randomly-paged TMDB discover calls, not an indexed local corpus. Exclusion/cooldown correctness was verified directly (DB state, escalation math, watched-never-reappears), but "does an explicit `status=unwatched` filter re-surface one specific previously-rejected title" is architecturally probabilistic until Stage 2.5 queries the corpus directly instead of re-rolling random TMDB pages.
 
 *Fixed in Stage 1 (`2026-08-13`):*
 - ~~Series genre coverage 46%~~ — TV genre ids seeded, per-row genre-link inserts (one bad FK no longer drops a title's whole genre set), 236 genre-less rows backfilled from TMDB. **99.6% series / 99.7% movie coverage**, verified live.

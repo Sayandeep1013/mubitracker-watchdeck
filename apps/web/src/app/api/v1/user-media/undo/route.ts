@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
       body.media_id,
       body.previous_status,
       body.previous_review_status,
+      { rejectCount: body.previous_reject_count, hiddenUntil: body.previous_hidden_until },
     );
     return apiOk(data);
   } catch (e) {

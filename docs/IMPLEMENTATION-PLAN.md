@@ -91,11 +91,11 @@ Spec [`20`](spec/20-deck-engine-v2.md). Requires Stage 1.
 
 **2A ships the biggest win on its own** — it retrofits into the existing `generate.ts` without the bucket service, and makes rejecting a card actually work.
 
-- [ ] **2.1 Cooldown schema + exclusion anti-join** — spec [`24`](spec/24-exclusion-cooldown.md)
+- [x] **2.1 Cooldown schema + exclusion anti-join** — spec [`24`](spec/24-exclusion-cooldown.md)
   Add `user_media.reject_count` / `hidden_until`, `deck_impressions`. Replace the in-memory `Set` (`generate.ts:133`) with a SQL anti-join — this also removes the silent PostgREST 1,000-row truncation that lets watched titles reappear.
   *Verify:* swipe-left hides for 14d; watched never returns; undo restores `reject_count`.
 
-- [ ] **2.2 Undo carries cooldown state** — extend `POST /api/v1/user-media/undo` with prior `reject_count`/`hidden_until`.
+- [x] **2.2 Undo carries cooldown state** — extend `POST /api/v1/user-media/undo` with prior `reject_count`/`hidden_until`.
   *Verify:* three mis-swipes + three undos leave the title eligible.
 
 - [ ] **2.3 Taste model** — spec [`22`](spec/22-taste-model.md). `user_taste` table, smoothing, 180-day recency half-life, <50-decision cold start.

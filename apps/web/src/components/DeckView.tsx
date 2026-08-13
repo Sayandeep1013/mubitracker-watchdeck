@@ -148,6 +148,8 @@ export function DeckView() {
       const title = current.title;
       const prevStatus = current.userStatus ?? 'unwatched';
       const prevReview = current.userReviewStatus ?? 'none';
+      const prevRejectCount = current.userRejectCount ?? 0;
+      const prevHiddenUntil = current.userHiddenUntil ?? null;
 
       if (action === 'watched' || action === 'unwatched') {
         stickyAction.current = action;
@@ -159,6 +161,8 @@ export function DeckView() {
             mediaId: current.id,
             previousStatus: prevStatus as UndoAction['previousStatus'],
             previousReviewStatus: prevReview as UndoAction['previousReviewStatus'],
+            previousRejectCount: prevRejectCount,
+            previousHiddenUntil: prevHiddenUntil,
             timestamp: new Date().toISOString(),
           },
           ...s,
@@ -226,6 +230,8 @@ export function DeckView() {
         media_id: last.mediaId,
         previous_status: last.previousStatus,
         previous_review_status: last.previousReviewStatus,
+        previous_reject_count: last.previousRejectCount,
+        previous_hidden_until: last.previousHiddenUntil,
       });
       showToast({ message: 'Undone', tone: 'undo' });
     } catch {

@@ -152,6 +152,8 @@ export class MubitrackerClient {
     media_id: string;
     previous_status: string;
     previous_review_status: string;
+    previous_reject_count?: number;
+    previous_hidden_until?: string | null;
   }) {
     return this.fetch('/api/v1/user-media/undo', { method: 'POST', body: JSON.stringify(body) });
   }

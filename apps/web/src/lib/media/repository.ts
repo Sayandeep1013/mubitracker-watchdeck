@@ -7,6 +7,7 @@ import {
   type ReviewStatus,
   type WatchStatus,
 } from '@mubitracker/shared';
+import { nextCooldownState } from '@/lib/deck/cooldown';
 
 export class RejectedContentError extends Error {
   constructor(reason: string) {
@@ -231,12 +232,24 @@ export async function getExternalId(
   return data?.external_id ?? null;
 }
 
+export interface CooldownOverride {
+  rejectCount: number;
+  hiddenUntil: string | null;
+}
+
+/**
+ * `cooldownOverride` restores exact prior reject_count/hidden_until values
+ * (undo, import) instead of deriving them from `status` (spec 24 §5) — pass
+ * it whenever the caller already knows the target state rather than is
+ * reacting to a fresh classification.
+ */
 export async function upsertUserMedia(
   supabase: SupabaseClient,
   userId: string,
   mediaId: string,
   status: WatchStatus,
   reviewStatus?: ReviewStatus,
+  cooldownOverride?: CooldownOverride,
 ) {
   const { data: existing } = await supabase
     .from('user_media')
@@ -257,6 +270,15 @@ export async function upsertUserMedia(
   if (status === 'watched' && !existing?.watched_at) {
     payload.watched_at = new Date().toISOString();
   }
+
+  const cooldown =
+    cooldownOverride ??
+    nextCooldownState(status, {
+      rejectCount: existing?.reject_count ?? 0,
+      hiddenUntil: existing?.hidden_until ?? null,
+    });
+  payload.reject_count = cooldown.rejectCount;
+  payload.hidden_until = cooldown.hiddenUntil;
 
   const { data, error } = await supabase
     .from('user_media')
