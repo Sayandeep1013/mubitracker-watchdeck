@@ -11,6 +11,10 @@ export interface ToastState {
   tone?: ToastTone;
   href?: string;
   hrefLabel?: string;
+  /** Spec 40 §7: friend-request toasts offer `[View] [Accept]`, not just a
+   * link — accepting here shouldn't require navigating away first. */
+  onAccept?: () => void;
+  acceptLabel?: string;
 }
 
 interface ActionToastProps {
@@ -43,14 +47,30 @@ export function ActionToast({ toast, onDismiss }: ActionToastProps) {
         ) : null}
         <div className="min-w-0 flex-1">
           <p className="text-sm leading-snug">{toast.message}</p>
-          {toast.href && (
-            <Link
-              href={toast.href}
-              className="mt-1 inline-block text-xs text-purple-300 underline-offset-2 hover:underline"
-              onClick={onDismiss}
-            >
-              {toast.hrefLabel ?? 'Open'}
-            </Link>
+          {(toast.href || toast.onAccept) && (
+            <div className="mt-1 flex items-center gap-3">
+              {toast.href && (
+                <Link
+                  href={toast.href}
+                  className="text-xs text-purple-300 underline-offset-2 hover:underline"
+                  onClick={onDismiss}
+                >
+                  {toast.hrefLabel ?? 'Open'}
+                </Link>
+              )}
+              {toast.onAccept && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    toast.onAccept?.();
+                    onDismiss();
+                  }}
+                  className="text-xs font-semibold text-green-400 underline-offset-2 hover:underline"
+                >
+                  {toast.acceptLabel ?? 'Accept'}
+                </button>
+              )}
+            </div>
           )}
         </div>
         <button

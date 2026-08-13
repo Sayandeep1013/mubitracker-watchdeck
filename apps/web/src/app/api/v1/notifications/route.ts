@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { apiError, apiOk, AuthError, requireAuth } from '@/lib/api/helpers';
+import { markNotificationsRead } from '@/lib/social/notifications';
 import { createSupabaseAdminClient } from '@/lib/supabase/server';
 
 export async function GET(request: NextRequest) {
@@ -49,31 +50,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/** @deprecated Use POST /api/v1/notifications/read (spec 40 §7). Kept as
+ * an alias for one release — same body shape, same behavior. */
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
     const body = (await request.json()) as { ids?: string[]; all?: boolean };
     const supabase = createSupabaseAdminClient();
-    const now = new Date().toISOString();
-
-    if (body.all) {
-      const { error } = await supabase
-        .from('notifications')
-        .update({ read_at: now })
-        .eq('user_id', user.id)
-        .is('read_at', null);
-      if (error) return apiError('DB_ERROR', error.message, 500);
-    } else if (body.ids?.length) {
-      const { error } = await supabase
-        .from('notifications')
-        .update({ read_at: now })
-        .eq('user_id', user.id)
-        .in('id', body.ids);
-      if (error) return apiError('DB_ERROR', error.message, 500);
-    } else {
-      return apiError('BAD_REQUEST', 'Provide ids or all=true', 400);
-    }
-
+    await markNotificationsRead(supabase, user.id, body);
     return apiOk({ ok: true });
   } catch (e) {
     if (e instanceof AuthError) return apiError('UNAUTHORIZED', e.message, 401);

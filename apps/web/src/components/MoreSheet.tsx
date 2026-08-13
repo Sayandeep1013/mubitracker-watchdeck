@@ -17,7 +17,7 @@ interface MoreSheetProps {
   onClose: () => void;
   unread: number;
   items: NotificationItem[];
-  onOpenNotifications: () => void;
+  onMarkAll: () => void;
 }
 
 const DESTINATIONS = [
@@ -56,7 +56,7 @@ export function MoreTrigger({
   );
 }
 
-export function MoreSheet({ open, onClose, unread, items, onOpenNotifications }: MoreSheetProps) {
+export function MoreSheet({ open, onClose, unread, items, onMarkAll }: MoreSheetProps) {
   const [showNotifications, setShowNotifications] = useState(false);
   const sheetRef = useRef<HTMLDivElement>(null);
 
@@ -76,8 +76,9 @@ export function MoreSheet({ open, onClose, unread, items, onOpenNotifications }:
   if (!open) return null;
 
   const toggleNotifications = () => {
+    // Spec 40 §7: opening the panel marks nothing — only the explicit
+    // "Mark all read" button (below) does.
     setShowNotifications((v) => !v);
-    if (!showNotifications) onOpenNotifications();
   };
 
   return (
@@ -127,13 +128,25 @@ export function MoreSheet({ open, onClose, unread, items, onOpenNotifications }:
         </button>
 
         {showNotifications && (
-          <div className="mt-1 max-h-56 overflow-y-auto rounded-lg border border-neutral-900 bg-neutral-900/40 p-2">
+          <div className="mt-1 rounded-lg border border-neutral-900 bg-neutral-900/40 p-2">
+            {unread > 0 && (
+              <button
+                type="button"
+                onClick={onMarkAll}
+                className="mb-1 px-2 text-[10px] text-neutral-500 hover:text-neutral-300"
+              >
+                Mark all read
+              </button>
+            )}
             {items.length === 0 ? (
               <p className="px-2 py-3 text-center text-xs text-neutral-600">No notifications</p>
             ) : (
-              <ul className="space-y-1">
+              <ul className="max-h-56 space-y-1 overflow-y-auto">
                 {items.map((n) => (
-                  <li key={n.id} className="rounded-lg px-2 py-2 text-xs text-neutral-300">
+                  <li
+                    key={n.id}
+                    className={`rounded-lg px-2 py-2 text-xs ${n.readAt ? 'text-neutral-500' : 'text-neutral-200'}`}
+                  >
                     {n.type === 'friend_request'
                       ? `@${n.actor?.username ?? 'someone'} sent a friend request`
                       : `@${n.actor?.username ?? 'someone'} accepted your request`}

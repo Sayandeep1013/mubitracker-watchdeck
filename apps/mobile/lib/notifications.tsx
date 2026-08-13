@@ -16,6 +16,8 @@ interface NotificationsContextValue {
   items: NotificationItem[];
   refresh: () => Promise<void>;
   markAllRead: () => Promise<void>;
+  markIncomingRead: () => Promise<void>;
+  markFriendshipRead: (friendshipId: string) => Promise<void>;
 }
 
 const NotificationsContext = createContext<NotificationsContextValue | null>(null);
@@ -62,6 +64,36 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     }
   }, [refresh]);
 
+  const markIds = useCallback(
+    async (ids: string[]) => {
+      if (!ids.length) return;
+      try {
+        await apiClient.markNotificationsRead({ ids });
+        await refresh();
+      } catch {
+        // Best-effort — badge just stays as-is until the next successful poll.
+      }
+    },
+    [refresh],
+  );
+
+  // Spec 40 §7: viewing Incoming clears friend-request unreads — opening
+  // the notifications modal itself must NOT mark anything read anymore.
+  const markIncomingRead = useCallback(() => {
+    const ids = items.filter((n) => n.type === 'friend_request' && !n.readAt).map((n) => n.id);
+    return markIds(ids);
+  }, [items, markIds]);
+
+  // Spec 40 §7: Accept/Decline/Block/Cancel on a request also clears its
+  // own notification, not just a bulk "mark all".
+  const markFriendshipRead = useCallback(
+    (friendshipId: string) => {
+      const ids = items.filter((n) => n.friendshipId === friendshipId && !n.readAt).map((n) => n.id);
+      return markIds(ids);
+    },
+    [items, markIds],
+  );
+
   useEffect(() => {
     refresh();
     const id = setInterval(refresh, POLL_MS);
@@ -69,7 +101,9 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   }, [refresh]);
 
   return (
-    <NotificationsContext.Provider value={{ unreadCount, items, refresh, markAllRead }}>
+    <NotificationsContext.Provider
+      value={{ unreadCount, items, refresh, markAllRead, markIncomingRead, markFriendshipRead }}
+    >
       {children}
     </NotificationsContext.Provider>
   );

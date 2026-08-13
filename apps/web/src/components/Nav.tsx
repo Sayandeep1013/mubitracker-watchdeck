@@ -50,7 +50,7 @@ export function Nav() {
             <Image src="/logo.png" alt="" width={24} height={24} className="rounded-md" />
             <span className="text-sm font-bold tracking-tight text-neutral-200">MUBITRACKER</span>
           </Link>
-          <NotificationBell unread={unread} items={items} onOpen={markAll} />
+          <NotificationBell unread={unread} items={items} onMarkAll={markAll} />
         </div>
         {links.map((link) => {
           const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
@@ -98,7 +98,7 @@ export function Nav() {
         onClose={() => setMoreOpen(false)}
         unread={unread}
         items={items}
-        onOpenNotifications={markAll}
+        onMarkAll={markAll}
       />
 
       <ActionToast toast={toast} onDismiss={dismissToast} />

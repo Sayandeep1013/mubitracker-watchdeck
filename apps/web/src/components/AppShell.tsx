@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { Nav } from './Nav';
+import { NotificationsFeedProvider } from '@/hooks/useNotificationsFeed';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -13,9 +14,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-neutral-950">
-      <Nav />
-      <main className="flex flex-1 flex-col pb-16 md:pb-0">{children}</main>
-    </div>
+    <NotificationsFeedProvider>
+      <div className="flex min-h-screen bg-neutral-950">
+        <Nav />
+        <main className="flex flex-1 flex-col pb-16 md:pb-0">{children}</main>
+      </div>
+    </NotificationsFeedProvider>
   );
 }

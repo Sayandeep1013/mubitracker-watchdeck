@@ -221,7 +221,7 @@ export class MubitrackerClient {
   }
 
   markNotificationsRead(body: { ids?: string[]; all?: boolean }) {
-    return this.fetch('/api/v1/notifications', { method: 'POST', body: JSON.stringify(body) });
+    return this.fetch('/api/v1/notifications/read', { method: 'POST', body: JSON.stringify(body) });
   }
 
   getFriendProfile(id: string) {

@@ -1,7 +1,9 @@
 'use client';
 
+import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { useApiClient } from '@/hooks/useApiClient';
+import { useNotificationsFeed } from '@/hooks/useNotificationsFeed';
 
 interface Friendship {
   id: string;
@@ -17,7 +19,9 @@ type Tab = 'friends' | 'incoming' | 'outgoing' | 'blocked';
 
 export default function FriendsPage() {
   const client = useApiClient();
-  const [tab, setTab] = useState<Tab>('friends');
+  const searchParams = useSearchParams();
+  const { markIncomingRead, markFriendshipNotificationsRead } = useNotificationsFeed();
+  const [tab, setTab] = useState<Tab>(searchParams.get('tab') === 'incoming' ? 'incoming' : 'friends');
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [incoming, setIncoming] = useState<Friendship[]>([]);
   const [outgoing, setOutgoing] = useState<Friendship[]>([]);
@@ -61,6 +65,12 @@ export default function FriendsPage() {
       })
       .catch(() => {});
   }, [load, client]);
+
+  // Spec 40 §7: viewing Incoming — not opening the notification bell —
+  // is what clears friend-request unreads.
+  useEffect(() => {
+    if (tab === 'incoming') markIncomingRead();
+  }, [tab, markIncomingRead]);
 
   const dismissNudge = (persist: boolean) => {
     setShowNudge(false);
@@ -248,6 +258,7 @@ export default function FriendsPage() {
                     type="button"
                     onClick={async () => {
                       await client.acceptFriend(f.id);
+                      markFriendshipNotificationsRead(f.id);
                       load();
                     }}
                     className="rounded border border-green-700 px-2 py-1 text-xs text-green-400"
@@ -258,6 +269,7 @@ export default function FriendsPage() {
                     type="button"
                     onClick={async () => {
                       await client.declineFriend(f.id);
+                      markFriendshipNotificationsRead(f.id);
                       load();
                     }}
                     className="rounded border border-neutral-700 px-2 py-1 text-xs text-neutral-400"
@@ -268,6 +280,7 @@ export default function FriendsPage() {
                     type="button"
                     onClick={async () => {
                       await client.blockFriend(f.id);
+                      markFriendshipNotificationsRead(f.id);
                       load();
                     }}
                     className="rounded border border-red-900 px-2 py-1 text-xs text-red-400"
@@ -298,6 +311,7 @@ export default function FriendsPage() {
                   type="button"
                   onClick={async () => {
                     await client.cancelFriend(f.id);
+                    markFriendshipNotificationsRead(f.id);
                     load();
                   }}
                   className="rounded border border-neutral-700 px-2 py-1 text-xs"

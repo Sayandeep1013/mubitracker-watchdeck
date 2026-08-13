@@ -5,6 +5,7 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient } from '@/lib/api';
 import { useFocusFetch } from '@/lib/useFocusFetch';
+import { useNotifications } from '@/lib/notifications';
 import { ScreenState } from '@/components/ScreenState';
 import { useToast } from '@/components/Toast';
 import { color, radius, space, type } from '@/lib/theme';
@@ -33,12 +34,19 @@ const NUDGE_KEY_PREFIX = 'mubitracker:discoverable-nudge-dismissed:';
 export default function FriendsScreen() {
   const router = useRouter();
   const showToast = useToast();
+  const { markIncomingRead, markFriendshipRead } = useNotifications();
   const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
   const [tab, setTab] = useState<Tab>(tabParam === 'incoming' ? 'incoming' : 'friends');
 
   useEffect(() => {
     if (tabParam === 'incoming') setTab('incoming');
   }, [tabParam]);
+
+  // Spec 40 §7: viewing Incoming — not opening the notifications modal —
+  // is what clears friend-request unreads.
+  useEffect(() => {
+    if (tab === 'incoming') markIncomingRead();
+  }, [tab, markIncomingRead]);
   const [copied, setCopied] = useState(false);
   const [showNudge, setShowNudge] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -108,6 +116,7 @@ export default function FriendsScreen() {
     try {
       await action();
       showToast({ message: successMessage, tone: 'success' });
+      markFriendshipRead(id);
       reload();
     } catch (e) {
       showToast({ message: e instanceof Error ? e.message : 'Action failed — try again', tone: 'error' });
