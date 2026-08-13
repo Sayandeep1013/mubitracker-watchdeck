@@ -139,7 +139,7 @@ async function main() {
       if (genreIds.length > 0) {
         await Promise.all(
           genreIds.map((genreId) =>
-            sb('media_genres', {
+            sb('media_genres?on_conflict=media_id,genre_id', {
               method: 'POST',
               headers: { Prefer: 'resolution=ignore-duplicates' },
               body: JSON.stringify({ media_id: row.id, genre_id: genreId }),

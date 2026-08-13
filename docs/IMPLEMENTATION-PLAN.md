@@ -101,17 +101,18 @@ Spec [`20`](spec/20-deck-engine-v2.md). Requires Stage 1.
 - [x] **2.3 Taste model** — spec [`22`](spec/22-taste-model.md). `user_taste` table, smoothing, 180-day recency half-life, <50-decision cold start.
   *Verify:* `rein`'s computed affinity reproduces the measured table ±0.05.
 
-- [ ] **2.4 Corpus ingestion** — spec [`21`](spec/21-corpus-ingestion.md). `scripts/ingest-corpus.mjs`, ~150 TMDB calls → ~3,000 titles.
+- [x] **2.4 Corpus ingestion** — spec [`21`](spec/21-corpus-ingestion.md). `scripts/ingest-corpus.mjs`, ~150 TMDB calls → ~3,000 titles.
   *Verify:* corpus ≥3,000 non-adult titles; re-run inserts 0 duplicates.
 
-- [ ] **2.5 Bucket service** — spec [`23`](spec/23-bucket-service.md). `deck_buckets`, assembly, quotas, 80/20, filter hashing, advisory lock, shortfall ladder.
+- [x] **2.5 Bucket service** — spec [`23`](spec/23-bucket-service.md). `deck_buckets`, assembly, quotas, 80/20, filter hashing, advisory lock, shortfall ladder.
   *Verify:* 50 interleaved items, 10 wildcards, `partial:true` instead of empty, no dead-end state.
 
-- [ ] **2.6 Background pre-build** — Next.js `after()`. **Verify `after()` works on Vercel first**; if not, use the documented synchronous fallback at item 35.
+- [x] **2.6 Background pre-build** — Next.js `after()`. **Verify `after()` works on Vercel first**; if not, use the documented synchronous fallback at item 35.
   *Verify:* a `ready` bucket serves in <150ms p95.
 
 - [ ] **2.7 Wire both clients to buckets** — replace cursor with `bucketId` in `DeckView.tsx` and `apps/mobile/app/(tabs)/deck.tsx`; honour `partial`/`reason`.
   *Verify:* filtered deck <800ms; no null-cursor dead end reachable.
+  > Route/server side is done (2.5/2.6) and shipped behind `DECK_ENGINE=v2` (unset in production — v1 unaffected). This item is specifically the *client* UI rewrite: replace `cursor`/`sessionId` state with `bucketId`, request the next bucket when the client crosses item 35, surface `partial`/`reason`. Not started.
 
 - [ ] **2.8 Retire v1** behind `DECK_ENGINE=v2` after a clean week.
 

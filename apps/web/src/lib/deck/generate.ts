@@ -17,9 +17,7 @@ import {
 import { tmdbDiscover } from '@/lib/tmdb/provider';
 import { upsertMediaBatch } from '@/lib/media/repository';
 import { isHiddenNow } from '@/lib/deck/cooldown';
-
-const IMPRESSION_SUPPRESS_MS = 24 * 60 * 60 * 1000;
-const IMPRESSION_PRUNE_MS = 30 * 24 * 60 * 60 * 1000;
+import { getRecentImpressions, recordImpressions } from '@/lib/deck/impressions';
 
 export interface ParsedDeckFilters {
   format?: MediaFormat[];
@@ -170,21 +168,6 @@ async function getUserMediaState(
   );
 }
 
-async function getRecentImpressions(
-  supabase: SupabaseClient,
-  userId: string,
-  mediaIds: string[],
-): Promise<Set<string>> {
-  if (!mediaIds.length) return new Set();
-  const { data } = await supabase
-    .from('deck_impressions')
-    .select('media_id')
-    .eq('user_id', userId)
-    .in('media_id', mediaIds)
-    .gt('shown_at', new Date(Date.now() - IMPRESSION_SUPPRESS_MS).toISOString());
-  return new Set((data ?? []).map((r) => r.media_id));
-}
-
 /** Explicit status filters override cooldown — the user is asking to see
  * exactly those titles (spec 24 §8). Impression suppression is not a
  * rejection signal, so it is never overridden by a status filter. */
@@ -216,28 +199,6 @@ async function getFriendWatchedIds(
     .eq('user_id', friendId)
     .eq('status', 'watched');
   return new Set((data ?? []).map((r) => r.media_id));
-}
-
-async function recordImpressions(
-  supabase: SupabaseClient,
-  userId: string,
-  mediaIds: string[],
-): Promise<void> {
-  if (!mediaIds.length) return;
-  const now = new Date().toISOString();
-  await supabase
-    .from('deck_impressions')
-    .upsert(
-      mediaIds.map((mediaId) => ({ user_id: userId, media_id: mediaId, shown_at: now })),
-      { onConflict: 'user_id,media_id' },
-    );
-  // Opportunistic prune — keeps the table bounded without a cron (Stage 5).
-  // Safe alongside the write above: it only targets rows older than 30 days.
-  await supabase
-    .from('deck_impressions')
-    .delete()
-    .eq('user_id', userId)
-    .lt('shown_at', new Date(Date.now() - IMPRESSION_PRUNE_MS).toISOString());
 }
 
 export interface DeckCursor {

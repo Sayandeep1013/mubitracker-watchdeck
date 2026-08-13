@@ -128,7 +128,19 @@ function affinityOf(dim: Record<string, number>, key: string): number {
  * largest-affinity buckets so slots always sum to exactly EXPLOIT_SLOTS.
  */
 export function deriveQuotas(vector: TasteVector): DeckQuotas {
-  if (vector.decisionCount < MIN_DECISIONS_FOR_TASTE) return { ...DEFAULT_QUOTAS };
+  if (vector.decisionCount < MIN_DECISIONS_FOR_TASTE) {
+    // DEFAULT_QUOTAS (30/10/10) is the spec-literal default ratio and sums
+    // to 50 — but deriveQuotas's contract is the 40 *exploit* slots, with
+    // explore's 10 wildcards added on top by the bucket service. Scale the
+    // ratio down rather than returning it verbatim, or a cold-start bucket
+    // ends up with 50 exploit + 10 explore = 60 items.
+    const total = DEFAULT_QUOTAS.movie + DEFAULT_QUOTAS.series + DEFAULT_QUOTAS.anime;
+    return {
+      movie: Math.round((DEFAULT_QUOTAS.movie / total) * EXPLOIT_SLOTS),
+      series: Math.round((DEFAULT_QUOTAS.series / total) * EXPLOIT_SLOTS),
+      anime: Math.round((DEFAULT_QUOTAS.anime / total) * EXPLOIT_SLOTS),
+    };
+  }
 
   const raw: DeckQuotas = {
     movie: affinityOf(vector.format, 'movie') * affinityOf(vector.classification, 'live_action'),

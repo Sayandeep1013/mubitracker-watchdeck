@@ -56,10 +56,10 @@ Username + password only. Under the hood, Supabase Auth with a **synthetic email
 
 **Known broken** — full list with evidence in [`AUDIT-2026-08-12.md`](AUDIT-2026-08-12.md). Status as of Stage 1 (`2026-08-13`):
 
-*Still broken — Stage 2.4 on:*
-- The deck engine can only reach **~400 titles**; a heavy account (283 tracked) has effectively exhausted it. (Stage 2.4 corpus ingestion — candidates still come from live TMDB discover, not a queryable local corpus, until then.)
-- Deck serving is still **taste-blind** — `getTaste`/`deriveQuotas` exist (Stage 2.3) but nothing calls them yet; that's Stage 2.5's job. A user who rejects 90% of live-action series still gets served them at the same rate as before.
-- One under-filled batch **permanently kills** the deck (null cursor → clients stop prefetching). (Stage 2.5–2.7 bucket service.)
+*Still true in production* (v2 exists and is verified but ships behind `DECK_ENGINE=v2`, unset in Vercel — nothing below changes for real users until Stage 2.7 finishes and 2.8 flips the flag):
+- The deck engine can only reach **~400 titles** per session; a heavy account (283 tracked) has effectively exhausted it.
+- Deck serving is still **taste-blind** in production — v1 (`generate.ts`) never calls `getTaste`/`deriveQuotas`. A user who rejects 90% of live-action series still gets served them at the same rate as before.
+- One under-filled batch **permanently kills** the deck (null cursor → clients stop prefetching) — v2's bucket model fixes this structurally (bucketId always has a next request), but clients aren't wired to it yet (Stage 2.7).
 - Mobile has **no friends UI at all**, no filters, no Watch Later, gesture-only actions, zero accessibility labels. (Stages 3–4.)
 
 *Fixed in Stage 2.1/2.2 (`2026-08-13`):*
@@ -69,7 +69,13 @@ Username + password only. Under the hood, Supabase Auth with a **synthetic email
 
 *Known limitation carried into 2.1 (not a defect, will resolve itself in 2.5):* candidates still come from live, randomly-paged TMDB discover calls, not an indexed local corpus. Exclusion/cooldown correctness was verified directly (DB state, escalation math, watched-never-reappears), but "does an explicit `status=unwatched` filter re-surface one specific previously-rejected title" is architecturally probabilistic until Stage 2.5 queries the corpus directly instead of re-rolling random TMDB pages.
 
-*Added in Stage 2.3 (`2026-08-13`), not yet consumed:* `getTaste()`/`deriveQuotas()` in `apps/web/src/lib/deck/taste.ts` — per-genre/format/classification affinity from `user_media` history, Laplace-smoothed, 180-day recency half-life, cached in `user_taste`. Verified against `rein`'s real history: genre affinities within ±0.03 of the audit's measured table, RPC executes in 10.5ms server-side. Nothing calls this yet — Stage 2.5 (bucket service) is where it starts actually shaping what gets served.
+*Added in Stage 2.3 (`2026-08-13`):* `getTaste()`/`deriveQuotas()` in `apps/web/src/lib/deck/taste.ts` — per-genre/format/classification affinity from `user_media` history, Laplace-smoothed, 180-day recency half-life, cached in `user_taste`. Verified against `rein`'s real history: genre affinities within ±0.03 of the audit's measured table, RPC executes in 10.5ms server-side.
+
+*Added in Stage 2.4-2.6 (`2026-08-13`), behind `DECK_ENGINE=v2` (unset in prod):*
+- Corpus ingestion (`scripts/ingest-corpus.mjs`) took `media` from 641 to 4,247 non-adult titles — see Session Log for the full breakdown.
+- `apps/web/src/lib/deck/bucket-service.ts` — `buildBucket`/`getReadyBucket`/`markServing`, `get_eligible_media` SQL function, `deck_buckets`/`deck_build_locks` tables. Wired into `GET /api/v1/deck` when `DECK_ENGINE=v2`, currently unset in Vercel so production traffic still runs v1's `generate.ts` unchanged.
+- Two real bugs found only by testing (not inspection): cold-start quotas producing 60-item buckets instead of 50, and a `get_eligible_media` query costing 1.24s server-side (fixed to 34.6ms) because genre aggregation ran before the LIMIT instead of after. Both fixed — see Session Log for detail.
+- `after()` background pre-build verified working locally; unverified on an actual Vercel deployment (flag isn't live there).
 
 *Fixed in Stage 1 (`2026-08-13`):*
 - ~~Series genre coverage 46%~~ — TV genre ids seeded, per-row genre-link inserts (one bad FK no longer drops a title's whole genre set), 236 genre-less rows backfilled from TMDB. **99.6% series / 99.7% movie coverage**, verified live.
@@ -91,9 +97,9 @@ Anything marked *awaiting device verification* is `[~]` in the plan and listed i
 
 Useful for reasoning about the engine without re-querying:
 
-- `media` ~638 rows (grows as deck/search discover new titles; no staging DB, this is production)
-- Genre coverage: **movies 99.7%**, **series 99.6%** (was 46% before Stage 1's TV-genre seed + backfill)
-- `media.adult` / `media.vote_count` columns added Stage 1 — populated on every upsert, backfilled for previously genre-less rows
+- `media` ~4,247 rows after Stage 2.4 corpus ingestion (grows further as deck/search discover new titles; no staging DB, this is production)
+- Genre coverage: **movies 99.96%**, **series 99.9%** (was 46% before Stage 1's TV-genre seed + backfill)
+- `media.adult` / `media.vote_count` columns added Stage 1 — populated on every upsert, backfilled for previously genre-less rows; `get_eligible_media` (Stage 2.5) additionally requires `vote_count >= 10` as defense-in-depth against pre-Stage-1 rows the content filter never touched
 - `deck_sessions` 9 rows, **0** with `shown_media_ids` populated (dead column)
 - Heaviest account `rein`: 283 decisions — 123 watched, 149 haven't, 11 watch later
 - `rein` taste signal: Sci-Fi 0.90 · Adventure 0.85 · Fantasy 0.81 · Action 0.73 · Crime 0.32 · Horror 0.36; **live-action movie 0.63 vs live-action series 0.10**

@@ -10,12 +10,20 @@ Read after [`CONTEXT.md`](CONTEXT.md). Then work [`IMPLEMENTATION-PLAN.md`](IMPL
 ```
 Read docs/CONTEXT.md, docs/HANDOFF.md, and docs/IMPLEMENTATION-PLAN.md.
 
-Stages 0-1 are shipped, and Stage 2.1-2.3 (cooldown + exclusion, undo
-carrying cooldown state, taste model) are done. Continue with 2.4 (corpus
-ingestion) — it's the prerequisite for 2.5 (bucket service), which is what
-finally makes the taste model and cooldown logic actually drive what's
-served instead of living unused next to the old TMDB-discover loop. Work
-top-down, one item at a time.
+Stages 0-1 are shipped, and Stage 2.1-2.6 are done (cooldown + exclusion,
+undo carrying cooldown state, taste model, corpus ingestion, bucket
+service, background pre-build). All of it ships behind `DECK_ENGINE=v2`,
+which is NOT set in Vercel — production is still v1, unaffected.
+
+Continue with 2.7: wire both clients (`DeckView.tsx`,
+`apps/mobile/app/(tabs)/deck.tsx`) to consume `bucketId` instead of
+`cursor`/`sessionId`. The route already returns both shapes depending on
+whether v2 is active (`{bucketId, items, position, partial, reason}` vs
+`{items, cursor, sessionId, message}`), so clients need to branch on which
+fields are present, or the flag needs to be set to test locally
+(`DECK_ENGINE=v2 pnpm --filter @mubitracker/web dev`). Do NOT set
+`DECK_ENGINE=v2` in Vercel until 2.7 is done and tested — that's 2.8's job,
+"after a clean week."
 
 For each item: implement → pnpm typecheck → write/extend its test →
 verify against the acceptance criterion → commit → update the checkbox
@@ -37,7 +45,7 @@ When you finish a stage, update this prompt block and tell me what
 changed.
 ```
 
-**Current position: Stage 1 and Stage 2.1-2.3 shipped (`2026-08-13`). Stage 2.4 (corpus ingestion) is next.**
+**Current position: Stage 1 and Stage 2.1-2.6 shipped (`2026-08-13`), behind `DECK_ENGINE=v2` (unset in prod). Stage 2.7 (client wiring) is next.**
 
 ### Pending verification
 
@@ -78,6 +86,29 @@ This is the mechanism that lets a session run without the user in the loop. Foll
 ## Session Log
 
 Newest first. One line per completed item; a block per stage.
+
+### 2026-08-13 — Stage 2.4-2.6 (corpus ingestion, bucket service, background pre-build)
+
+Specs [`21`](spec/21-corpus-ingestion.md) · [`23`](spec/23-bucket-service.md). Shipped behind `DECK_ENGINE=v2`, unset in Vercel — **production is unaffected**, still serving v1 (`generate.ts`). This is the biggest chunk of the plan; details below because the next session needs them to finish 2.7 correctly.
+
+| Item | Change |
+|---|---|
+| 2.4 | `scripts/ingest-corpus.mjs`: format × sort × decade × page discover axes (2×3×6×3=108 calls) plus targeted anime/animation/documentary passes (~30 calls), same content filter as the app, `media_rejected` table so rejected TMDB ids aren't re-evaluated on a later pass. Two runs (pages 1-3, then a deeper 4-8/6-15 pass) took the corpus from 641 to 4,247 non-adult titles — series coverage 1798/1800 (99.9%), movie 2446/2447 (99.96%), 0 duplicate `(provider, external_id)` pairs, 0 orphaned `media` rows, 0 `adult=true`. |
+| 2.5 | `deck_buckets` + `deck_build_locks` tables, `get_eligible_media(...)` SQL function (the eligibility anti-join from spec 24 §7 plus format/classification/genre/language/year filters), and new `apps/web/src/lib/deck/bucket-service.ts`: `buildBucket` (taste-weighted exploit quotas via 2.3's `getTaste`/`deriveQuotas`, 10-wildcard explore excluding the user's top-3 genres, a 4-step shortfall ladder ending in `partial:true` + a `no_matches_for_filters`/`corpus_exhausted` reason code — never a bare empty response), `getReadyBucket`/`getBucketById`/`markServing`, `computeFilterHash`. `GET /api/v1/deck` branches to the bucket path when `DECK_ENGINE=v2` and the filters don't need friend/status-filtered v1 semantics (`supportsBucketAlgorithm`). |
+| 2.6 | `after()` (stable in Next 15.5.23) schedules the next bucket build once the response is flushed — verified working locally; not yet observed on a real Vercel deployment since the flag isn't on there. |
+
+**Two real bugs found and fixed during verification, not by inspection — both would have shipped broken if untested:**
+1. `deriveQuotas`'s cold-start branch returned the literal spec default `{movie:30, series:10, anime:10}` (sums to 50), but the bucket algorithm always adds 10 explore slots on top of whatever `deriveQuotas` returns — cold-start buckets came out **60 items**, not 50. Fixed by scaling the 30/10/10 *ratio* down to sum to the 40-slot exploit budget (24/8/8) instead of returning it verbatim.
+2. `get_eligible_media` originally did `left join media_genres … group by … order by random() limit`, which forces Postgres to aggregate genre arrays for *every* eligible row (thousands) before the limit applies — **1.24s** per call measured via `EXPLAIN ANALYZE`. Restructured to filter/order-by-popularity/limit in a CTE first, then join `media_genres` only for the kept rows: **34.6ms**, a 36x improvement. Also swapped `order by random()` for `order by popularity desc` — the bucket service already oversamples 3x and shuffles in JS, so SQL-level true randomness wasn't buying anything but cost.
+
+**Also found and fixed:** `pg_try_advisory_xact_lock` (the spec's literal suggestion for the build concurrency guard) doesn't fit this app — PostgREST issues each query as its own isolated request with no session affinity, and an advisory *transaction* lock releases the instant the request that acquired it returns, but `buildBucket()` spans many separate round-trips, not one DB transaction. Replaced with a `deck_build_locks` row (unique key, `on conflict do nothing`, 60s staleness reclaim) — same atomic single-winner guarantee, works correctly across independent REST calls.
+
+**Verified live** (`DECK_ENGINE=v2 pnpm --filter @mubitracker/web dev`, fresh test accounts against production DB): cold build → 50 items, ≤50 always, 0 in-bucket duplicates; resume via `?bucket=<id>` returns the identical bucket; different filters produce different `bucketId`s; `format=movie` bucket is 100% movies; a deliberately narrow filter (`documentary`+`ko`+`1950-1960`) correctly returns `partial:true, reason:'no_matches_for_filters'` instead of an error or silent empty array; 3 concurrent requests for a fresh filter combo produced 2 distinct bucket builds, not 3 — the lock mostly holds (see caveat below). Cold-build latency measured **1.6s from this dev machine**, down from an unoptimized 6.9s; server-side query cost is confirmed ~35ms via `EXPLAIN ANALYZE`, so the residual gap is this environment's WAN round-trip to Supabase (~200ms/hop × ~7 sequential round-trips), not server-side cost — same caveat as Stage 2.3's taste-RPC timing. Real p95 against a same-region Vercel deployment (bom1 ↔ ap-south-1) is unverified; **re-measure once 2.7 lets this run from an actual deployment**, since "1.6s from a laptop in the wrong region" is not the same claim as "<800ms p95 in prod."
+
+**Known gaps to close before 2.8 (flipping the flag in prod):**
+- The build lock is best-effort, not airtight — 2/3 concurrent cold requests for a brand-new filter combo still produced 2 builds in testing (acceptable diagnostically, not literally "advisory lock holds" from spec 23's acceptance criterion). A genuinely pathological rapid-fire client could still cause a handful of redundant builds; they self-heal (only one ends up `ready`) but waste a query.
+- Explore's 10-wildcard-excludes-top-3-genres behavior is verified by code inspection against spec 24 §8's truth table, not by an end-to-end check against a real ≥50-decision account (would need `rein`'s actual password, which this session doesn't have).
+- Real production latency (Vercel↔Supabase same-region) is unmeasured — only local-dev-to-Supabase WAN timing exists so far.
 
 ### 2026-08-13 — Stage 2.3 (taste model)
 
