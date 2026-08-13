@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons';
+import { useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Dimensions, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -45,6 +46,12 @@ const ACTION_META: Record<
 export default function DeckScreen() {
   const insets = useSafeAreaInsets();
   const showToast = useToast();
+  // Friends → Their Deck (spec 40 §3) navigates here with these params —
+  // matches web's `?friend_id=&friend_mode=` handling in DeckView.tsx.
+  const { friend_id: friendId, friend_mode: friendMode } = useLocalSearchParams<{
+    friend_id?: string;
+    friend_mode?: string;
+  }>();
   const [queue, setQueue] = useState<DeckItem[]>([]);
   const [index, setIndex] = useState(0);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -87,6 +94,10 @@ export default function DeckScreen() {
     try {
       await syncOfflineQueue();
       const params = new URLSearchParams();
+      if (friendId) {
+        params.set('friend_id', friendId);
+        if (friendMode) params.set('friend_mode', friendMode);
+      }
       if (engineMode.current !== 'v2') {
         if (cursor) params.set('cursor', cursor);
         if (sessionId) params.set('session_id', sessionId);
@@ -118,7 +129,7 @@ export default function DeckScreen() {
       fetching.current = false;
       setInitialLoadDone(true);
     }
-  }, [cursor, sessionId]);
+  }, [cursor, sessionId, friendId, friendMode]);
 
   useEffect(() => {
     loadDeck();

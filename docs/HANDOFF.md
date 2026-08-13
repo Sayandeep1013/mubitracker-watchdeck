@@ -88,6 +88,8 @@ Code-complete but unverified — all need the Android device. Run `maestro test 
 | 3.2/3.5/3.6 deck gesture map + fallback buttons | `mobile-qa/flows/deck-gesture-map-and-buttons.yaml` — **written, never run** |
 | 3.3/3.4 toast + review-modal keyboard handling | `mobile-qa/flows/toast-and-keyboard.yaml` — **written, never run** |
 | 3.1 theme tokens, 3.7 per-screen states | no dedicated flow — mostly visual; do a manual pass and screenshot each of the 7 screens' loading/empty/error states, log results in the Session Log below |
+| 4.1 mobile privacy toggle + Copy handle | covered incidentally by `friends-ui.yaml`'s Copy handle assertion; no dedicated toggle check yet |
+| 4.2 mobile friends UI (tab, add modal, notifications) | `mobile-qa/flows/friends-ui.yaml` — **written, never run**, single-device scope only (no request/accept/block/unblock/Compare/Their Deck coverage — needs a second identity) |
 
 ---
 

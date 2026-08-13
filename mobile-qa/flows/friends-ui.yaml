@@ -1,0 +1,84 @@
+# Plan item 4.2 — mobile friends UI (Friends tab, add-friend modal, friend
+# detail, notifications), spec 40 §3.
+#
+# Written 2026-08-13 without a connected Android device — validated by
+# reading friends.tsx / friends/add.tsx / friends/[id].tsx / notifications.tsx
+# and their accessibilityLabel strings, not by running it. Treat a first run
+# as validating the FLOW as much as the app.
+#
+# Single-device scope only: this checks the UI a lone signed-in account can
+# reach (tab navigation, nudge, add-friend modal, search-as-you-type,
+# notifications modal). It CANNOT verify request/accept/block/unblock or
+# Compare/Their Deck against a real second account from one device — that
+# needs either a second physical device or simulating a second identity via
+# direct backend API calls (see the autonomous-mobile-qa skill), neither of
+# which this stub attempts. Extend this flow (or write a second one) once
+# that's available, rather than trusting this alone as full 4.2 coverage.
+
+appId: host.exp.exponent
+name: Mobile friends UI — single-device reachable surface
+tags:
+  - regression
+  - friends
+---
+- runFlow: ../subflows/open-project.yaml
+- runFlow: ../subflows/sign-in.yaml
+
+- extendedWaitUntil:
+    visible: "Deck"
+    timeout: 45000
+
+- tapOn: "Friends"
+- extendedWaitUntil:
+    visible: "Friends"
+    timeout: 15000
+
+# New account defaults to private — the first-run nudge (spec 40 §2) should
+# be showing, with a Copy handle row above it.
+- assertVisible: "Copy handle"
+- assertVisible: "Let people find you by username?"
+
+- tapOn:
+    text: "Copy handle"
+- takeScreenshot: friends-copy-handle
+
+- tapOn:
+    text: "Not now"
+- assertNotVisible: "Let people find you by username?"
+
+# Segmented control — all four tabs reachable and don't crash on an
+# all-empty account.
+- tapOn: "Incoming"
+- assertVisible: "No incoming requests"
+- tapOn: "Outgoing"
+- assertVisible: "No outgoing requests"
+- tapOn: "Blocked"
+- assertVisible: "No blocked users"
+- tapOn: "Friends"
+- assertVisible: "No friends yet"
+
+# Add-friend modal
+- tapOn:
+    text: "Add a friend"
+- extendedWaitUntil:
+    visible: "Add a friend"
+    timeout: 10000
+- tapOn:
+    hint: "Search public profiles"
+- inputText: "mq"
+- extendedWaitUntil:
+    visible: "Add"
+    timeout: 5000
+    optional: true
+- takeScreenshot: friends-add-search-results
+- tapOn: "Close"
+- assertVisible: "Friends"
+
+# Notifications modal — should open empty for a fresh account and not error.
+- tapOn:
+    text: "Notifications"
+- extendedWaitUntil:
+    visible: "Notifications"
+    timeout: 10000
+- assertVisible: "No notifications"
+- tapOn: "Close"

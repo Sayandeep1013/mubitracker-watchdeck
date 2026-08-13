@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { ToastProvider } from '@/components/Toast';
+import { NotificationsProvider } from '@/lib/notifications';
 import { color } from '@/lib/theme';
 
 function useAuthGuard() {
@@ -73,11 +74,16 @@ export default function RootLayout() {
         <ToastProvider>
           <StatusBar style="light" />
           {checked ? (
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="login" />
-              <Stack.Screen name="review/[id]" options={{ presentation: 'modal' }} />
-            </Stack>
+            <NotificationsProvider>
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="login" />
+                <Stack.Screen name="review/[id]" options={{ presentation: 'modal' }} />
+                <Stack.Screen name="friends/add" options={{ presentation: 'modal' }} />
+                <Stack.Screen name="friends/notifications" options={{ presentation: 'modal' }} />
+                <Stack.Screen name="friends/[id]" />
+              </Stack>
+            </NotificationsProvider>
           ) : (
             <View style={styles.splash} accessibilityLabel="Loading Mubitracker">
               <ActivityIndicator color={color.primary} size="large" />
