@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      analytics_events: {
+        Row: {
+          created_at: string
+          event: string
+          id: string
+          platform: string
+          properties: Json
+          request_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event: string
+          id?: string
+          platform: string
+          properties?: Json
+          request_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event?: string
+          id?: string
+          platform?: string
+          properties?: Json
+          request_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analytics_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deck_buckets: {
         Row: {
           created_at: string
@@ -661,6 +699,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      analytics_classification_latency_percentiles: {
+        Args: { p_since?: string }
+        Returns: {
+          p50_ms: number
+          p90_ms: number
+          platform: string
+          samples: number
+        }[]
+      }
       compute_user_taste: { Args: { p_user_id: string }; Returns: Json }
       get_eligible_media: {
         Args: {

@@ -34,7 +34,21 @@ async function rateLimitedFetch(url: string, init?: RequestInit): Promise<Respon
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
   lastRequestTime = Date.now();
 
+  const start = Date.now();
   const res = await fetch(url, init);
+  const ms = Date.now() - start;
+  // Spec 50 §6 structured log — `cached` is always false until 5.4's TMDB
+  // cache lands; every call today is a real network round-trip.
+  console.log(
+    JSON.stringify({
+      evt: 'tmdb.call',
+      path: new URL(url).pathname,
+      ms,
+      status: res.status,
+      cached: false,
+    }),
+  );
+
   if (res.status === 429) {
     const retryAfter = parseInt(res.headers.get('Retry-After') ?? '2', 10);
     await new Promise((r) => setTimeout(r, retryAfter * 1000));

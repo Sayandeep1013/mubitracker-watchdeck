@@ -399,11 +399,14 @@ export async function generateDeck(
   limit: number,
   cursorRaw: string | null,
   sessionId?: string,
+  requestId?: string,
 ): Promise<{ items: DeckItem[]; cursor: string | null; sessionId: string; message?: string }> {
   if (filters.friendId) {
     return generateFriendDeck(supabase, userId, filters, limit, cursorRaw, sessionId);
   }
 
+  const genStart = Date.now();
+  let tmdbMs = 0;
   let session = sessionId;
   if (!session) {
     const { data } = await supabase
@@ -433,7 +436,9 @@ export async function generateDeck(
   while (items.length < limit && attempts < maxPages) {
     attempts++;
     const tmdbParams = buildTmdbParams(filters, format);
+    const tmdbStart = Date.now();
     const discovered = await tmdbDiscover(format, page, tmdbParams);
+    tmdbMs += Date.now() - tmdbStart;
     const upserted = await upsertMediaBatch(supabase, discovered);
 
     const pageIds = upserted.map((m) => m.id);
@@ -494,6 +499,28 @@ export async function generateDeck(
   if (served.length > 0) {
     await recordImpressions(supabase, userId, served.map((i) => i.id));
   }
+
+  console.log(
+    JSON.stringify({
+      evt: 'deck.generate',
+      ms: Date.now() - genStart,
+      tmdb_pages: attempts,
+      tmdb_ms: tmdbMs,
+      candidates: candidatesConsidered,
+      excluded: candidatesConsidered - candidatesEligible,
+      returned: served.length,
+      filtered: Boolean(
+        filters.format?.length ||
+          filters.classification?.length ||
+          filters.genreNames?.length ||
+          filters.language?.length ||
+          filters.yearFrom != null ||
+          filters.yearTo != null ||
+          filters.status?.length,
+      ),
+      req_id: requestId,
+    }),
+  );
 
   const nextCursor =
     finalItems.length >= limit

@@ -48,7 +48,8 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(parseInt(searchParams.get('limit') ?? String(DECK_BATCH_SIZE), 10), 50);
     const cursor = searchParams.get('cursor');
     const sessionId = searchParams.get('session_id') ?? undefined;
-    const result = await generateDeck(supabase, user.id, filters, limit, cursor, sessionId);
+    const requestId = request.headers.get('x-request-id') ?? undefined;
+    const result = await generateDeck(supabase, user.id, filters, limit, cursor, sessionId, requestId);
 
     return apiOk({
       items: result.items,
