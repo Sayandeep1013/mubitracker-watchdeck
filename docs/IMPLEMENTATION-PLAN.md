@@ -148,7 +148,8 @@ Spec [`40`](spec/40-friends-v2.md). Requires Stage 3 tokens for consistency.
 - [~] **4.2 Mobile friends UI** — currently 100% absent; the shared client already has 11 friends methods.
   > New Friends tab: list (Friends/Incoming/Outgoing/Blocked segmented), add-friend modal, friend detail (Compare/Their Deck/Block/Unblock), notifications modal + badge, first-run nudge (deferred from 4.1). `deck.tsx` now forwards `friend_id`/`friend_mode` so Their Deck works. Typecheck-only — no device this session. Maestro flow `mobile-qa/flows/friends-ui.yaml` covers the single-device-reachable surface; written, never run.
 - [ ] **4.3 Mobile filters + presets** — entirely absent.
-- [ ] **4.4 Mobile Watch Later** — no gesture, action, screen, or tab.
+- [~] **4.4 Mobile Watch Later** — no gesture, action, screen, or tab.
+  > Gesture/action already existed since 3.6 (↑ = Watch Later). Added the missing screen (`app/watch-later.tsx`) as a pushed screen reachable via a clock-icon header button on Collection, not a new bottom tab — deliberately avoids the exact tab-bar-crowding problem 4.6 fixed on web (mobile already grew to 6 tabs via 4.2's Friends addition). Typecheck-only, no device this session.
 - [~] **4.5 Mobile undo depth 1 → 20** to match web.
   > Converted the single `lastAction` slot into a stack capped at `MAX_UNDO_STACK` (20), same constant web already uses. Typecheck-only — no device this session.
 - [x] **4.6 Web mobile-breakpoint nav** — bottom bar renders `links.slice(0,5)`, so Friends/Profile/bell are unreachable under `md`.
@@ -159,8 +160,10 @@ Spec [`40`](spec/40-friends-v2.md). Requires Stage 3 tokens for consistency.
   > `DELETE /api/v1/friends/[id]/block`, restricted to whoever placed the block (`blocked_by` column). Verified live: non-blocker unblock 403s, blocker unblock 200s + deletes row, second unblock 404s, either side can re-request after unblock.
 - [x] **4.9 Reverse-accepted duplicate guard** — B can re-request A after acceptance, creating a second row.
   > POST now loads any existing row for the pair and branches on status (`accepted`→409, pending same-direction→409, pending reverse→auto-accept, `blocked`→403); backed by a unique index across both directions. Verified live.
-- [ ] **4.10 Mobile `/about`** — TMDB attribution missing on mobile (licensing gap).
-- [ ] **4.11 Mobile SecureStore** — session is in `AsyncStorage`; spec 08 requires `expo-secure-store` (installed, unused).
+- [~] **4.10 Mobile `/about`** — TMDB attribution missing on mobile (licensing gap).
+  > New `app/about.tsx`, text-only attribution + outbound link (no logo asset — would need `react-native-svg`, not installed, not worth adding for one static image). Linked from Profile. Typecheck-only, no device this session.
+- [~] **4.11 Mobile SecureStore** — session is in `AsyncStorage`; spec 08 requires `expo-secure-store` (installed, unused).
+  > `lib/supabase.ts` now uses a SecureStore-backed storage adapter for the session. Known unverified risk noted in-code: SecureStore's ~2048-byte Android item limit — not expected to bite password-only auth, but genuinely unverified without a device. `offline-queue.ts`'s separate AsyncStorage usage (spec 08's action queue) is untouched, per spec. Typecheck-only.
 - [ ] **4.12 Web `/reviews` list screen** — spec [`32`](spec/32-web-ux.md) §4 (Written/Pending tabs). Scoped into spec 32 but not covered by Stage 3.8 or any other 4.x item; folded in here per the gap flagged in `HANDOFF.md` rather than left untracked.
 - [ ] **4.13 Notifications alignment** — spec [`40`](spec/40-friends-v2.md) §7 (endpoint path, read-timing, toast actions, badge parity across web/mobile). Scoped into spec 40 but not an original 4.1-4.11 item; same gap pattern as 4.12.
 

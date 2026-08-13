@@ -73,7 +73,7 @@ When you finish a stage, update this prompt block and tell me what
 changed.
 ```
 
-**Current position: Stage 1, all of Stage 2 (2.1-2.7), all of Stage 3 (3.1-3.8), and Stage 4.1/4.2/4.5/4.6/4.7-4.9 shipped (`2026-08-13`). Deck v2 is behind `DECK_ENGINE=v2` (unset in prod); Stage 2.8 needs the user's go-ahead before flipping the flag. Stage 3.8, 4.6, and 4.7-4.9 are `[x]`, verified live; 4.1 and 4.2 are `[~]` (4.1's web half verified live; both typecheck-only on mobile); 4.5 is `[~]` mobile typecheck-only. Stage 3.1-3.7 (mobile) is `[~]` — code-complete/typecheck-clean but no Android device this session. Next up: 4.3, 4.4, 4.10-4.13 — mostly mobile-only, theoretical implementation per the no-device policy.**
+**Current position: Stage 1, all of Stage 2 (2.1-2.7), all of Stage 3 (3.1-3.8), and Stage 4.1/4.2/4.4/4.5/4.6/4.7-4.9/4.10/4.11 shipped (`2026-08-13`). Deck v2 is behind `DECK_ENGINE=v2` (unset in prod); Stage 2.8 needs the user's go-ahead before flipping the flag. Stage 3.8, 4.6, and 4.7-4.9 are `[x]`, verified live; everything else mobile-touching in Stage 4 is `[~]` (typecheck-only, no device this session). Stage 3.1-3.7 (mobile) is also `[~]`. Only 4.3 (mobile filters + presets), 4.12 (web /reviews list screen), and 4.13 (notifications alignment) remain in Stage 4.**
 
 ### Pending verification
 
@@ -119,6 +119,16 @@ This is the mechanism that lets a session run without the user in the loop. Foll
 ## Session Log
 
 Newest first. One line per completed item; a block per stage.
+
+### 2026-08-13 — Stage 4.4/4.10/4.11 (mobile Watch Later, About, SecureStore) — `4159970`, `8b1e5ab`
+
+4.4: gesture/action for Watch Later already existed since Stage 3.6; only the screen was missing (Collection lists watch_later items mixed in undifferentiated, unlike web's dedicated page). Added `app/watch-later.tsx` (poster/title/year rows, "Mark watched" per row) as a **pushed screen, not an 8th bottom tab** — a deliberate deviation from the plan item's literal "screen, or tab" wording, reasoned in the commit: mobile already grew from 5 to 6 tabs this session (4.2's Friends tab), and an 8th would risk the exact cramped-bar problem 4.6 just fixed on web. Reachable via a clock-icon header button on the Collection tab instead.
+
+4.10: new `app/about.tsx` — TMDB attribution text + outbound link, matching web's content. Text-only, no logo graphic (`react-native-svg` isn't installed and wasn't worth adding for one static image). Linked from a new "About / TMDB Credits" button on Profile.
+
+4.11: `lib/supabase.ts` now stores the Supabase session via Expo SecureStore instead of AsyncStorage (spec 08) — the dependency was already installed and unused. Left an in-code comment flagging SecureStore's ~2048-byte Android per-item limit as a genuinely unverified risk (this app is password-only auth, so the session shouldn't approach that size, but "shouldn't" isn't "verified") and named the documented mitigation (LargeSecureStore: AES-encrypt + AsyncStorage blob, SecureStore holds just the key) without implementing it, since adding `expo-crypto`/`aes-js` for a failure mode never observed against this app's actual session shape isn't justified yet. `offline-queue.ts`'s AsyncStorage usage (spec 08's separate action queue) is untouched.
+
+**All three typecheck-only — no Android device connected this session.**
 
 ### 2026-08-13 — Stage 4.5/4.6 (mobile undo depth, web mobile nav) — `a2be8bb`, `de71f80`
 
