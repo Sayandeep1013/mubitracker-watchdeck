@@ -149,8 +149,10 @@ Spec [`40`](spec/40-friends-v2.md). Requires Stage 3 tokens for consistency.
   > New Friends tab: list (Friends/Incoming/Outgoing/Blocked segmented), add-friend modal, friend detail (Compare/Their Deck/Block/Unblock), notifications modal + badge, first-run nudge (deferred from 4.1). `deck.tsx` now forwards `friend_id`/`friend_mode` so Their Deck works. Typecheck-only — no device this session. Maestro flow `mobile-qa/flows/friends-ui.yaml` covers the single-device-reachable surface; written, never run.
 - [ ] **4.3 Mobile filters + presets** — entirely absent.
 - [ ] **4.4 Mobile Watch Later** — no gesture, action, screen, or tab.
-- [ ] **4.5 Mobile undo depth 1 → 20** to match web.
-- [ ] **4.6 Web mobile-breakpoint nav** — bottom bar renders `links.slice(0,5)`, so Friends/Profile/bell are unreachable under `md`.
+- [~] **4.5 Mobile undo depth 1 → 20** to match web.
+  > Converted the single `lastAction` slot into a stack capped at `MAX_UNDO_STACK` (20), same constant web already uses. Typecheck-only — no device this session.
+- [x] **4.6 Web mobile-breakpoint nav** — bottom bar renders `links.slice(0,5)`, so Friends/Profile/bell are unreachable under `md`.
+  > 5 items (Deck/Search/Collection/Reviews/More) + a bottom sheet (Watch Later/Friends/Profile/Notifications/About). Notification polling extracted to `useNotificationsFeed()` so desktop bell and mobile sheet share one poller instead of double-polling/double-toasting. Verified live in a real headless browser at 390×844 (all sheet behaviors) and 1280×900 on the same session (no desktop regression).
 - [x] **4.7 `friendMode` semantics** — `watched_not_me`, `watched`, unset all collapse to one predicate; `reviewed` unhandled.
   > Rewritten to source candidates directly from the friend's own `user_media`/`reviews` (stable pagination) instead of intersecting random TMDB discover pages with the friend's watched set — the latter made "Their Deck" thin/empty in practice. Verified live against production DB with a 3-account scenario covering all three modes, pagination, and access errors.
 - [x] **4.8 Unblock route** — block is currently irreversible.

@@ -73,7 +73,7 @@ When you finish a stage, update this prompt block and tell me what
 changed.
 ```
 
-**Current position: Stage 1, all of Stage 2 (2.1-2.7), all of Stage 3 (3.1-3.8), and Stage 4.1/4.2/4.7-4.9 shipped (`2026-08-13`). Deck v2 is behind `DECK_ENGINE=v2` (unset in prod); Stage 2.8 needs the user's go-ahead before flipping the flag. Stage 3.8 and 4.7-4.9 are `[x]`, verified live; 4.1 and 4.2 are `[~]` (4.1's web half verified live; both are typecheck-only on mobile). Stage 3.1-3.7 (mobile) is `[~]` — code-complete/typecheck-clean but no Android device this session. Next up: 4.3-4.6/4.10-4.13 — mostly mobile-only items to be implemented theoretically per the no-device policy, with pending tests recorded for later; 4.6 is web-only and verifiable live.**
+**Current position: Stage 1, all of Stage 2 (2.1-2.7), all of Stage 3 (3.1-3.8), and Stage 4.1/4.2/4.5/4.6/4.7-4.9 shipped (`2026-08-13`). Deck v2 is behind `DECK_ENGINE=v2` (unset in prod); Stage 2.8 needs the user's go-ahead before flipping the flag. Stage 3.8, 4.6, and 4.7-4.9 are `[x]`, verified live; 4.1 and 4.2 are `[~]` (4.1's web half verified live; both typecheck-only on mobile); 4.5 is `[~]` mobile typecheck-only. Stage 3.1-3.7 (mobile) is `[~]` — code-complete/typecheck-clean but no Android device this session. Next up: 4.3, 4.4, 4.10-4.13 — mostly mobile-only, theoretical implementation per the no-device policy.**
 
 ### Pending verification
 
@@ -119,6 +119,14 @@ This is the mechanism that lets a session run without the user in the loop. Foll
 ## Session Log
 
 Newest first. One line per completed item; a block per stage.
+
+### 2026-08-13 — Stage 4.5/4.6 (mobile undo depth, web mobile nav) — `a2be8bb`, `de71f80`
+
+4.5, spec 40: mobile's deck (`(tabs)/deck.tsx`) tracked only a single `lastAction`, so only the most recent classify could be undone. Converted to a stack capped at the same `MAX_UNDO_STACK` (20) constant web already uses — push on classify, pop on each Undo tap. Typecheck-only, no device this session.
+
+4.6, spec 32 §6: web's mobile bottom bar rendered `links.slice(0,5)`, which happened to include Reviews but left Profile and the notification bell completely unreachable under the `md` breakpoint. Rebuilt per spec: 4 static items (Deck/Search/Collection/Reviews) + a More button opening a bottom sheet (Watch Later/Friends/Profile/About as links, Notifications as an in-sheet expandable list), with the same unread badge, active-state styling on sheet-owned routes, and close-on-select/backdrop/Esc. Extracted notification polling into `useNotificationsFeed()` (single instance, shared by desktop bell + mobile sheet via props) since both surfaces exist in the DOM simultaneously — two independent pollers would have double-toasted the same friend request. As a side effect, mobile now gets the friend-request toast at all, which previously only fired on desktop.
+
+**Verified 4.6 live** in a real headless browser: 390×844 confirmed the bar's exact link set, all 5 sheet destinations, Esc/backdrop/selection-close behavior, active styling on a sheet route, and the notifications toggle; 1280×900 on the same authenticated session confirmed zero desktop regression (bell renders, dropdown works, Friends stays a direct rail link, mobile bar/sheet don't render). Zero console errors in either mode.
 
 ### 2026-08-13 — Stage 4.2 (mobile friends UI) — `a5394b9`
 
