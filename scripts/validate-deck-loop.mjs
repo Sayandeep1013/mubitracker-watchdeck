@@ -19,7 +19,10 @@ const BASE = process.env.BASE_URL || 'http://localhost:3000';
 const SUPABASE_URL = env.NEXT_PUBLIC_SUPABASE_URL;
 const ANON = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const stamp = Date.now().toString().slice(-8);
-const username = process.env.TEST_USERNAME || `deck_${stamp}`;
+// wqa* prefix (spec 50 §5) so cleanup-test-accounts.mjs's allowlist catches
+// this script's accounts too — `deck_` is kept in that allowlist only for
+// pre-existing rows created before this default changed.
+const username = process.env.TEST_USERNAME || `wqa${stamp}`;
 const password = process.env.TEST_PASSWORD || 'MubitrackerTest123!';
 const reuseExisting = Boolean(process.env.TEST_USERNAME);
 
