@@ -70,3 +70,6 @@ export type RecommendationsResponse = Recommendation[];
 export type PendingReviewsResponse = (MediaSummary & { reviewStatus: string })[];
 export type FilterPresetsResponse = FilterPreset[];
 export type CompareResponse = CollectionComparison;
+export interface ReviewsResponse {
+  reviews: Review[];
+}

@@ -8,6 +8,7 @@ import type {
   ImportResult,
   PendingReviewsResponse,
   RecommendationsResponse,
+  ReviewsResponse,
   SearchResponse,
 } from './types/api.js';
 import type { Profile, Review } from './types/user.js';
@@ -95,6 +96,14 @@ export class MubitrackerClient {
     return this.fetch<CollectionResponse>(`/api/v1/collection${qs ? `?${qs}` : ''}`);
   }
 
+  getReviews() {
+    return this.fetch<ReviewsResponse>('/api/v1/reviews');
+  }
+
+  getReview(id: string) {
+    return this.fetch<Review>(`/api/v1/reviews/${id}`);
+  }
+
   getPendingReviews() {
     return this.fetch<PendingReviewsResponse>('/api/v1/reviews/pending');
   }
@@ -108,6 +117,10 @@ export class MubitrackerClient {
       method: 'PATCH',
       body: JSON.stringify(body),
     });
+  }
+
+  deleteReview(id: string) {
+    return this.fetch<{ deleted: boolean }>(`/api/v1/reviews/${id}`, { method: 'DELETE' });
   }
 
   exportData() {

@@ -23,7 +23,7 @@ const links = [
   { href: '/search', label: 'Search', Icon: IconSearch },
   { href: '/collection', label: 'Collection', Icon: IconLibrary },
   { href: '/watch-later', label: 'Later', Icon: IconClock },
-  { href: '/review-later', label: 'Reviews', Icon: IconBookmark },
+  { href: '/reviews', label: 'Reviews', Icon: IconBookmark },
   { href: '/friends', label: 'Friends', Icon: IconUsers },
   { href: '/profile', label: 'Profile', Icon: IconUser },
 ];
