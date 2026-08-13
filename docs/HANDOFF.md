@@ -10,51 +10,47 @@ Read after [`CONTEXT.md`](CONTEXT.md). Then work [`IMPLEMENTATION-PLAN.md`](IMPL
 ```
 Read docs/CONTEXT.md, docs/HANDOFF.md, and docs/IMPLEMENTATION-PLAN.md.
 
-Stages 0-1, all of Stage 2 (2.1-2.7), all of Stage 3 (3.1-3.8), and
-Stage 4's backend trio (4.7-4.9) are done. Stage 2 is the entire
-deck-engine v2 rewrite — it ships behind `DECK_ENGINE=v2`, which is NOT
-set in Vercel, so production is still v1, unaffected. Stage 3 is the UX
-feedback layer on both clients. Stage 4.7-4.9 are the friends-system
-backend fixes: friend-deck mode semantics (candidates now come from the
-friend's own `user_media`/`reviews` directly, not random TMDB pages
-intersected with their watched set), an unblock route, and a
-reverse-accepted duplicate-request guard.
+Stages 0-1, all of Stage 2 (2.1-2.7), all of Stage 3 (3.1-3.8), and all
+of Stage 4 except 4.12/4.13 are done. Stage 2 is the entire deck-engine
+v2 rewrite — it ships behind `DECK_ENGINE=v2`, which is NOT set in
+Vercel, so production is still v1, unaffected. Stage 3 is the UX
+feedback layer on both clients. Stage 4 closed the friends-system gaps
+(backend: friend-deck mode semantics, unblock, duplicate-request guard;
+mobile: a full Friends tab, privacy settings, filters+presets, Watch
+Later, About, SecureStore, multi-level undo; web: the 5-item+More mobile
+nav).
 
-Web's Stage 3.8 and Stage 4.7-4.9 work was verified live (headless
-Playwright for 3.8; direct API calls with throwaway test accounts
-against production DB for 4.7-4.9) — trust it. **Mobile's Stage 3.1-3.7
-was NOT** — no Android device was connected this session, so it's
-typecheck-clean and code-reviewed by hand only, left at `[~]` in the
-plan. Treat it as a real risk area, not "done," until it's actually run
-on a device. The same no-device caveat will apply to the mobile-only
-items still ahead in Stage 4 (4.2, 4.3, 4.4, 4.5, 4.10, 4.11) — implement
-them theoretically (code-complete + typecheck-verified), add a Maestro
-flow stub or explicit note for later verification, and move on. Do not
-attempt manual/simulated device testing with no device connected.
+Web's Stage 3.8 and Stage 4.6-4.9 (and 4.1's web half) work was verified
+live (headless Playwright / direct API calls against production DB) —
+trust those. **Everything mobile-touching this session was NOT** — no
+Android device was connected all session, so it's typecheck-clean and
+code-reviewed by hand only, left at `[~]` in the plan (Stage 3.1-3.7 and
+Stage 4's 4.1's mobile half, 4.2, 4.3, 4.4, 4.5, 4.10, 4.11). Treat all
+of it as a real risk area, not "done," until it's actually run on a
+device — Maestro flow stubs exist for most of it (`mobile-qa/flows/`,
+see the README status table) but are themselves unrun; a first run of
+any of them is validating the flow's own syntax as much as the app.
 
 Two things are explicitly waiting on the user, not on you:
 1. **Stage 2.8** (flip `DECK_ENGINE=v2` in Vercel) — user-visible
    production change, needs a direct go-ahead first. Don't flip it
    unprompted even if everything else looks green.
-2. **Stage 3.1-3.7 device verification** — if an Android device is
-   connected (check: adb devices), manually run through the deck's
-   gestures/buttons, toast, keyboard handling, and each screen's
-   loading/empty/error states before promoting any of `[~]` 3.1-3.7 to
-   `[x]`. Maestro flows exist for some of it (`mobile-qa/flows/`,
-   see the README status table) but are themselves unrun.
+2. **Device verification for everything mobile** — if an Android device
+   is connected (check: adb devices), run through `mobile-qa/flows/` and
+   do a manual pass over anything without a dedicated flow (3.1/3.7
+   theme+states, 4.1's mobile privacy toggle). Promote `[~]` to `[x]`
+   only for what you actually ran, one item at a time — don't batch-
+   promote the whole list because most of it passed.
 
-Continue with the rest of **Stage 4**: 4.1 (privacy settings UI, web +
-mobile), 4.2 (mobile friends UI — the largest remaining item), 4.3
-(mobile filters/presets), 4.4 (mobile Watch Later screen), 4.5 (mobile
-undo depth), 4.6 (web mobile-breakpoint nav — this also closes the
-spec-32 §6 gap flagged last session), 4.10 (mobile /about), 4.11
-(mobile SecureStore). Two more items were added this session to close
-gaps flagged but not folded in last time: **4.12** (web `/reviews` list
-screen, spec 32 §4) and **4.13** (notifications alignment, spec 40 §7)
-— both were scoped into their specs but absent from the original 4.1-4.11
-list, so per last session's own note ("fold them into Stage 4 ... if
-they want it tracked explicitly") they're now explicit checklist items
-rather than left as prose gaps.
+Finish **Stage 4** with its last two items, both web-only and web-
+verifiable (no device needed): **4.12** (a new `/reviews` list screen
+with Written/Pending tabs, spec 32 §4) and **4.13** (notifications
+alignment — endpoint path, read-timing, toast actions, badge parity
+across web/mobile, spec 40 §7). Both were scoped into their specs but
+absent from the original 4.1-4.11 list; they're explicit checklist items
+now, not prose gaps. Once they land, all of Stage 4 is done and Stage 5
+(pipeline & observability) is next — see its items in
+IMPLEMENTATION-PLAN.md.
 
 For each item: implement → pnpm typecheck → write/extend its test →
 verify against the acceptance criterion (or, for mobile-only items with
@@ -73,7 +69,7 @@ When you finish a stage, update this prompt block and tell me what
 changed.
 ```
 
-**Current position: Stage 1, all of Stage 2 (2.1-2.7), all of Stage 3 (3.1-3.8), and Stage 4.1/4.2/4.4/4.5/4.6/4.7-4.9/4.10/4.11 shipped (`2026-08-13`). Deck v2 is behind `DECK_ENGINE=v2` (unset in prod); Stage 2.8 needs the user's go-ahead before flipping the flag. Stage 3.8, 4.6, and 4.7-4.9 are `[x]`, verified live; everything else mobile-touching in Stage 4 is `[~]` (typecheck-only, no device this session). Stage 3.1-3.7 (mobile) is also `[~]`. Only 4.3 (mobile filters + presets), 4.12 (web /reviews list screen), and 4.13 (notifications alignment) remain in Stage 4.**
+**Current position: Stage 1, all of Stage 2 (2.1-2.7), all of Stage 3 (3.1-3.8), and Stage 4.1-4.11 shipped (`2026-08-13`). Deck v2 is behind `DECK_ENGINE=v2` (unset in prod); Stage 2.8 needs the user's go-ahead before flipping the flag. Stage 3.8, 4.6, and 4.7-4.9 are `[x]`, verified live; everything else mobile-touching in Stage 4 is `[~]` (typecheck-only, no device this session). Stage 3.1-3.7 (mobile) is also `[~]`. Only 4.12 (web /reviews list screen, spec 32 §4) and 4.13 (notifications alignment, spec 40 §7) remain in Stage 4 — both web-only/web-verifiable, so they can close out with live verification like 4.6/4.7-4.9 did.**
 
 ### Pending verification
 
@@ -120,6 +116,16 @@ This is the mechanism that lets a session run without the user in the loop. Foll
 ## Session Log
 
 Newest first. One line per completed item; a block per stage.
+
+### 2026-08-13 — Stage 4.3 (mobile filters + presets) — `86dab83`
+
+Spec [`06`](spec/06-filter-system.md). Last mobile-only item in Stage 4 — mobile had no way to filter the deck or save/apply presets at all.
+
+New `lib/filters.tsx` (`FiltersProvider`/`useFilters()`) holds a `DeckFilters` state shared between the Deck tab and a new `app/filters.tsx` modal — expo-router has no "return a result" navigation primitive, so this plays the role web's local `useState` in `DeckView.tsx` does, just lifted to context so a separate route can read/write it. The modal mirrors web's `FilterDrawer.tsx` almost 1:1 (same `FILTER_TYPE_OPTIONS`/`GENRE_MAP`/`RELEASE_ERAS` constants from `@mubitracker/shared`, same preset client methods). `(tabs)/deck.tsx`'s `loadDeck()` now merges `deckFiltersToSearchParams(filters)` into every request and accepts an optional `{cursor, sessionId}` override — mirrors web's `fetchBatch(overrides)` pattern exactly, needed because calling `loadDeck()` right after resetting cursor/sessionId state would otherwise read the stale pre-reset values from its closure (state updates haven't committed yet in the same tick). The existing near-end-of-queue prefetch effect is untouched and still can't double-fire against the reset effect (same `fetching.current` ref guard). New Filters header button on Deck (sliders icon + active-count badge).
+
+New Maestro flow `mobile-qa/flows/filters-and-presets.yaml` — written, never run. Typecheck-only — no Android device connected this session.
+
+**Stage 4 is now down to 4.12 and 4.13** — everything else (4.1-4.11) has shipped this session.
 
 ### 2026-08-13 — Stage 4.4/4.10/4.11 (mobile Watch Later, About, SecureStore) — `4159970`, `8b1e5ab`
 
