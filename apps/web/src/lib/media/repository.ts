@@ -1,11 +1,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import {
+  checkContentFilter,
   getDisplayType,
   type MediaSummary,
   type NormalizedMedia,
   type ReviewStatus,
   type WatchStatus,
 } from '@mubitracker/shared';
+
+export class RejectedContentError extends Error {
+  constructor(reason: string) {
+    super(`Rejected by content filter: ${reason}`);
+    this.name = 'RejectedContentError';
+  }
+}
 
 export interface DbMedia {
   id: string;
@@ -45,20 +53,87 @@ export function toMediaSummary(row: DbMedia): MediaSummary {
   };
 }
 
+/**
+ * Inserts each (media_id, genre_id) link as its own statement so a genre id
+ * that violates the FK (e.g. a TMDB id not yet seeded into `genres`) only
+ * drops that one link, not every genre for the title.
+ */
+async function linkGenres(
+  supabase: SupabaseClient,
+  mediaId: string,
+  genreIds: number[],
+): Promise<void> {
+  await Promise.all(
+    genreIds.map((genreId) =>
+      supabase
+        .from('media_genres')
+        .upsert({ media_id: mediaId, genre_id: genreId }, { onConflict: 'media_id,genre_id' }),
+    ),
+  );
+}
+
+async function refreshMediaMetadata(
+  supabase: SupabaseClient,
+  mediaId: string,
+  normalized: NormalizedMedia,
+): Promise<DbMedia> {
+  const { data: updated, error } = await supabase
+    .from('media')
+    .update({
+      title: normalized.title,
+      original_title: normalized.originalTitle,
+      overview: normalized.overview,
+      release_date: normalized.releaseDate,
+      year: normalized.year,
+      poster_path: normalized.posterPath,
+      backdrop_path: normalized.backdropPath,
+      runtime: normalized.runtime,
+      popularity: normalized.popularity,
+      adult: normalized.adult,
+      vote_count: normalized.voteCount,
+    })
+    .eq('id', mediaId)
+    .select()
+    .single();
+
+  if (error || !updated) throw new Error(error?.message ?? 'Failed to refresh media');
+
+  if (normalized.genreIds.length > 0) {
+    await linkGenres(supabase, mediaId, normalized.genreIds);
+  }
+
+  return updated as DbMedia;
+}
+
 export async function upsertMedia(
   supabase: SupabaseClient,
   normalized: NormalizedMedia,
 ): Promise<MediaSummary> {
+  // Checked before the existing/new branch below so a title that was
+  // wrongly seeded before this filter existed also gets excluded the next
+  // time deck/search re-discovers it — without touching (or deleting) the
+  // row, so any user_media a person already recorded against it survives.
+  const filterResult = checkContentFilter({
+    title: normalized.title,
+    overview: normalized.overview,
+    adult: normalized.adult,
+    voteCount: normalized.voteCount,
+    genreIds: normalized.genreIds,
+  });
+  if (filterResult.rejected) {
+    throw new RejectedContentError(filterResult.reason ?? 'unknown');
+  }
+
   const { data: existing } = await supabase
     .from('media_external_ids')
-    .select('media_id, media(*)')
+    .select('media_id')
     .eq('provider', normalized.provider)
     .eq('external_id', normalized.providerId)
     .maybeSingle();
 
-  if (existing?.media) {
-    const m = existing.media as unknown as DbMedia;
-    return toMediaSummary(m);
+  if (existing?.media_id) {
+    const updated = await refreshMediaMetadata(supabase, existing.media_id, normalized);
+    return toMediaSummary(updated);
   }
 
   const { data: inserted, error } = await supabase
@@ -76,33 +151,62 @@ export async function upsertMedia(
       backdrop_path: normalized.backdropPath,
       runtime: normalized.runtime,
       popularity: normalized.popularity,
+      adult: normalized.adult,
+      vote_count: normalized.voteCount,
     })
     .select()
     .single();
 
   if (error || !inserted) throw new Error(error?.message ?? 'Failed to insert media');
 
-  await supabase.from('media_external_ids').insert({
-    media_id: inserted.id,
-    provider: normalized.provider,
-    external_id: normalized.providerId,
-  });
+  // Claim the external-id link. Two concurrent upserts for the same new
+  // title can both reach this point after both missing the lookup above —
+  // `on conflict do nothing` lets exactly one of them win the link.
+  const { data: linked, error: linkError } = await supabase
+    .from('media_external_ids')
+    .upsert(
+      { media_id: inserted.id, provider: normalized.provider, external_id: normalized.providerId },
+      { onConflict: 'provider,external_id', ignoreDuplicates: true },
+    )
+    .select('media_id')
+    .maybeSingle();
+
+  if (linkError) throw new Error(linkError.message);
+
+  if (!linked) {
+    // Lost the race — another request's row already owns this external id.
+    // Discard our orphan insert and refresh the winner's metadata instead.
+    await supabase.from('media').delete().eq('id', inserted.id);
+    const { data: winner } = await supabase
+      .from('media_external_ids')
+      .select('media_id')
+      .eq('provider', normalized.provider)
+      .eq('external_id', normalized.providerId)
+      .single();
+    const updated = await refreshMediaMetadata(supabase, winner!.media_id, normalized);
+    return toMediaSummary(updated);
+  }
 
   if (normalized.genreIds.length > 0) {
-    await supabase.from('media_genres').upsert(
-      normalized.genreIds.map((genreId) => ({ media_id: inserted.id, genre_id: genreId })),
-      { onConflict: 'media_id,genre_id' },
-    );
+    await linkGenres(supabase, inserted.id, normalized.genreIds);
   }
 
   return toMediaSummary(inserted as DbMedia);
 }
 
+/**
+ * One rejected/failed item (e.g. content filter, a transient FK issue)
+ * must not sink the whole discover/search page — each item settles
+ * independently and only the successes are returned.
+ */
 export async function upsertMediaBatch(
   supabase: SupabaseClient,
   items: NormalizedMedia[],
 ): Promise<MediaSummary[]> {
-  return Promise.all(items.map((item) => upsertMedia(supabase, item)));
+  const settled = await Promise.allSettled(items.map((item) => upsertMedia(supabase, item)));
+  return settled
+    .filter((r): r is PromiseFulfilledResult<MediaSummary> => r.status === 'fulfilled')
+    .map((r) => r.value);
 }
 
 export async function getMediaById(

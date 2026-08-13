@@ -67,15 +67,19 @@ Independent, small, immediately felt. No prerequisites. **Do these first.**
 
 **Blocks Stage 2.** These silently corrupt quotas if deferred. Spec [`21`](spec/21-corpus-ingestion.md) §5–6.
 
-- [ ] **1.1 Seed TMDB TV genre IDs + backfill**
+> **Shipped 2026-08-13.** Series genre coverage 44%→99.6%. All three items
+> verified live against production DB (no staging environment yet — see
+> Stage 5.5). See Session Log in `HANDOFF.md` for detail.
+
+- [x] **1.1 Seed TMDB TV genre IDs + backfill**
   `genres` holds only the 19 movie IDs. TV genres (`10759`, `10762`–`10768`) violate the FK, and because links insert as one multi-row statement, one bad ID drops **all** genres for that title. Series coverage is **46%** vs movies' 99%. Seed, switch to per-row `on conflict do nothing`, backfill.
   *Verify:* series genre coverage ≥95%.
 
-- [ ] **1.2 De-duplicate `media` + fix upsert** — `apps/web/src/lib/media/repository.ts:85`
+- [x] **1.2 De-duplicate `media` + fix upsert** — `apps/web/src/lib/media/repository.ts:85`
   Unique violation unchecked → concurrent upserts create two rows for one film → the same film appears as two cards. Add conflict handling, a dedupe migration, and metadata refresh (currently `upsertMedia` early-returns so `popularity` is never updated).
   *Verify:* no two `media` rows share a `(provider, external_id)` pair.
 
-- [ ] **1.3 Adult-content filter** — spec [`21`](spec/21-corpus-ingestion.md) §4
+- [x] **1.3 Adult-content filter** — spec [`21`](spec/21-corpus-ingestion.md) §4
   `include_adult:false` only catches TMDB-flagged titles; a fresh account was served a 2001 R-18 title as card #2.
   *Verify:* no adult title in 200 sampled corpus rows.
 

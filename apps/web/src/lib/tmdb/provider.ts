@@ -21,6 +21,8 @@ interface TmdbResult {
   genre_ids?: number[];
   popularity?: number;
   runtime?: number;
+  adult?: boolean;
+  vote_count?: number;
 }
 
 let lastRequestTime = 0;
@@ -102,6 +104,8 @@ function normalizeTmdbItem(item: TmdbResult, format: MediaFormat): NormalizedMed
     runtime: item.runtime ?? null,
     genreIds,
     popularity: item.popularity ?? 0,
+    adult: item.adult ?? false,
+    voteCount: item.vote_count ?? 0,
   };
 }
 

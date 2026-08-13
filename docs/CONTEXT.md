@@ -54,15 +54,20 @@ Username + password only. Under the hood, Supabase Auth with a **synthetic email
 
 **Measured performance** (after the `bom1` region move): card→card advance **275ms** web / instant mobile; most pages <1s. Mobile is **not** slow. The remaining hot spots are **filtered deck loads (~9s)** and **title search (~6.2s)**.
 
-**Known broken** — full list with evidence in [`AUDIT-2026-08-12.md`](AUDIT-2026-08-12.md). Status as of Stage 0 (`539641a`):
+**Known broken** — full list with evidence in [`AUDIT-2026-08-12.md`](AUDIT-2026-08-12.md). Status as of Stage 1 (`2026-08-13`):
 
-*Still broken — Stages 1–5:*
-- The deck engine can only reach **~400 titles**; a heavy account (283 tracked) has effectively exhausted it.
-- Swiping left (**"haven't watched"**) has **no effect** — those titles are never excluded.
-- One under-filled batch **permanently kills** the deck (null cursor → clients stop prefetching).
-- Series genre coverage is **46%** (movies 99%) — TMDB TV genre IDs are missing from `genres`.
-- Mobile has **no friends UI at all**, no filters, no Watch Later, gesture-only actions, zero accessibility labels.
-- Adult / R-18 titles can reach a default deck.
+*Still broken — Stage 2 on:*
+- The deck engine can only reach **~400 titles**; a heavy account (283 tracked) has effectively exhausted it. (Stage 2.4 corpus ingestion.)
+- Swiping left (**"haven't watched"**) has **no effect** — those titles are never excluded. (Stage 2.1 cooldown/exclusion.)
+- One under-filled batch **permanently kills** the deck (null cursor → clients stop prefetching). (Stage 2.5–2.7 bucket service.)
+- Mobile has **no friends UI at all**, no filters, no Watch Later, gesture-only actions, zero accessibility labels. (Stages 3–4.)
+
+*Fixed in Stage 1 (`2026-08-13`):*
+- ~~Series genre coverage 46%~~ — TV genre ids seeded, per-row genre-link inserts (one bad FK no longer drops a title's whole genre set), 236 genre-less rows backfilled from TMDB. **99.6% series / 99.7% movie coverage**, verified live.
+- ~~`media` duplicate rows on concurrent upsert~~ — `upsertMedia` now claims the `media_external_ids` link with `on conflict do nothing`; the loser of a race discards its orphan insert and refreshes the winner's metadata instead. Verified 0 duplicate `(provider, external_id)` pairs and 0 orphaned `media` rows under a live test run.
+- ~~Adult content could reach the deck~~ — `checkContentFilter` (TMDB `adult` flag, keyword blocklist, genre-free+low-votes shape, `vote_count<10`) now gates every `media` write (deck discover, search, import). Backfill swept the 236 genre-less rows against fresh TMDB data: 1 unreferenced title deleted, 13 flagged-but-user-tracked titles left untouched (never destroys a user's own history), 0 `adult=true` rows remain.
+- ~~`upsertMedia` never refreshed metadata on existing rows~~ — now updates `popularity`/genres/etc. on every touch instead of early-returning.
+- ~~One bad item could sink a whole discover/search page~~ — `upsertMediaBatch` uses `Promise.allSettled`; a rejected or failed item is dropped, not fatal to the batch.
 
 *Fixed in Stage 0:*
 - ~~Web Collection pagination unreachable~~ — pager shipped, E2E verified.
@@ -73,13 +78,13 @@ Username + password only. Under the hood, Supabase Auth with a **synthetic email
 
 Anything marked *awaiting device verification* is `[~]` in the plan and listed in [`HANDOFF.md`](HANDOFF.md).
 
-## 6. Reference data (live DB, 2026-08-12)
+## 6. Reference data (live DB, 2026-08-13)
 
 Useful for reasoning about the engine without re-querying:
 
-- `media` 554 rows · `media_genres` 1,167 links
-- Genre coverage: **movies 99%**, **series 46%** (TV genre IDs missing from `genres` — see spec 21 §5)
-- Corpus split: 335 movie / 219 series · 418 live_action / 83 anime / 48 animation / 5 documentary
+- `media` ~638 rows (grows as deck/search discover new titles; no staging DB, this is production)
+- Genre coverage: **movies 99.7%**, **series 99.6%** (was 46% before Stage 1's TV-genre seed + backfill)
+- `media.adult` / `media.vote_count` columns added Stage 1 — populated on every upsert, backfilled for previously genre-less rows
 - `deck_sessions` 9 rows, **0** with `shown_media_ids` populated (dead column)
 - Heaviest account `rein`: 283 decisions — 123 watched, 149 haven't, 11 watch later
 - `rein` taste signal: Sci-Fi 0.90 · Adventure 0.85 · Fantasy 0.81 · Action 0.73 · Crime 0.32 · Horror 0.36; **live-action movie 0.63 vs live-action series 0.10**

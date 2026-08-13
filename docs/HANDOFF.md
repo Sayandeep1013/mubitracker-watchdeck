@@ -1,6 +1,6 @@
 # Session Handoff
 
-Last updated: **2026-08-12**
+Last updated: **2026-08-13**
 Read after [`CONTEXT.md`](CONTEXT.md). Then work [`IMPLEMENTATION-PLAN.md`](IMPLEMENTATION-PLAN.md) top-down.
 
 ---
@@ -10,12 +10,18 @@ Read after [`CONTEXT.md`](CONTEXT.md). Then work [`IMPLEMENTATION-PLAN.md`](IMPL
 ```
 Read docs/CONTEXT.md, docs/HANDOFF.md, and docs/IMPLEMENTATION-PLAN.md.
 
-Stage 0 is shipped. Continue with Stage 1 (deck engine prerequisites),
-then Stage 2. Work top-down, one item at a time.
+Stages 0-1 are shipped. Continue with Stage 2 (deck engine v2), starting
+at 2.1 (cooldown + exclusion) — it's the biggest single win and retrofits
+into generate.ts without needing the bucket service yet. Work top-down,
+one item at a time.
 
 For each item: implement → pnpm typecheck → write/extend its test →
 verify against the acceptance criterion → commit → update the checkbox
 in IMPLEMENTATION-PLAN.md → append to the Session Log in HANDOFF.md.
+
+There is no staging Supabase yet (Stage 5.5) — migrations and verification
+queries run directly against production. Use the Supabase MCP for
+migrations/queries; keep them additive and reversible where possible.
 
 If my Android device is connected (check: adb devices), first clear the
 Stage 0 mobile items still marked [~] by running:
@@ -29,7 +35,7 @@ When you finish a stage, update this prompt block and tell me what
 changed.
 ```
 
-**Current position: Stage 0 shipped (`539641a`). Stage 1 is next.**
+**Current position: Stage 1 shipped (`2026-08-13`). Stage 2 is next, starting at 2.1.**
 
 ### Pending verification
 
@@ -70,6 +76,22 @@ This is the mechanism that lets a session run without the user in the loop. Foll
 ## Session Log
 
 Newest first. One line per completed item; a block per stage.
+
+### Stage 1 complete — 2026-08-13
+
+No Android device connected this session, so Stage 0's four `[~]` mobile items are still pending device verification (unchanged from last session — see below).
+
+Applied directly against production (no staging DB — see spec 50 / Stage 5.5), via Supabase MCP migrations + a one-off Node backfill script.
+
+| Item | Change |
+|---|---|
+| 1.1 | Migration seeds the 8 missing TMDB TV genre ids. `repository.ts` now inserts each `(media_id, genre_id)` link as its own statement (`linkGenres`) instead of one multi-row upsert, so a single bad FK can no longer drop every genre for a title. New `scripts/backfill-media-metadata.mjs` re-fetched TMDB details for every genre-less row and linked genres. Series coverage **46% → 99.6%** (movies 99.7%), verified live. |
+| 1.2 | `upsertMedia` rewritten: claims the `media_external_ids` link via `upsert(..., { onConflict: 'provider,external_id', ignoreDuplicates: true })`; the loser of a concurrent-insert race deletes its orphan `media` row and refreshes the winner's metadata instead of leaving a duplicate. Existing rows are now refreshed (`popularity`, genres, etc.) on every touch instead of early-returning stale data. `upsertMediaBatch` moved to `Promise.allSettled` so one failing item can't sink the whole batch — needed for 1.3 below, and incidentally fixes a latent "one bad title fails the whole discover page" bug. Verified 0 duplicate `(provider, external_id)` pairs and 0 orphaned `media` rows, including under a live local test run. |
+| 1.3 | New `checkContentFilter` in `@mubitracker/shared` (TMDB `adult` flag, title/overview keyword blocklist, genre-free+`vote_count<50` shape, `vote_count<10`) — spec 21 §4's four rules verbatim. `NormalizedMedia` gained `adult`/`voteCount`; `media` table gained matching columns. Gate lives in `upsertMedia`, applied to *both* the insert and existing-row-refresh paths, so a title wrongly seeded before this filter existed also gets excluded next time it's re-discovered — without deleting the row, so it can't destroy a user's own tracked history. The backfill script additionally swept the 236 genre-less rows against fresh TMDB data: 1 unreferenced title deleted outright, 13 rejected-but-user-tracked titles left alone. 0 `adult=true` rows remain. |
+
+**Two things worth remembering:**
+- `media` is a shared global cache with no staging separation — every migration and backfill this session ran directly against production. Stage 5.5 (staging Supabase) is overdue; until then, treat DB changes here with the same care as a prod deploy.
+- The backfill script's delete step is intentionally conservative: a row is only ever deleted if *no* `user_media`/`reviews`/`recommendations` row references it. A heuristic content filter WILL sometimes flag legitimate low-profile titles (documentaries, regional TV) — 13 of 14 flagged rows this run were exactly that, not actual adult content, and all 13 were correctly left in place because a user had already tracked them.
 
 ### Stage 0 complete — 2026-08-12 (`539641a`)
 

@@ -36,6 +36,8 @@ export interface NormalizedMedia {
   runtime: number | null;
   genreIds: number[];
   popularity: number;
+  adult: boolean;
+  voteCount: number;
 }
 
 export interface ExternalId {
