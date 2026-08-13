@@ -3,6 +3,7 @@ export * from './types/media.js';
 export * from './types/user.js';
 export * from './types/filters.js';
 export * from './types/api.js';
+export * from './types/analytics.js';
 export * from './schemas/index.js';
 export * from './constants/tmdb.js';
 export * from './constants/genres.js';
