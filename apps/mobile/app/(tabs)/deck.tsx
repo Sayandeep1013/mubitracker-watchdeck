@@ -15,7 +15,7 @@ import Animated, {
   Extrapolation,
 } from 'react-native-reanimated';
 import type { DeckItem, ReviewStatus, WatchStatus } from '@mubitracker/shared';
-import { tmdbPosterUrl } from '@mubitracker/shared';
+import { MAX_UNDO_STACK, tmdbPosterUrl } from '@mubitracker/shared';
 import { apiClient } from '@/lib/api';
 import { enqueueOfflineAction, syncOfflineQueue } from '@/lib/offline-queue';
 import { useToast } from '@/components/Toast';
@@ -61,7 +61,10 @@ export default function DeckScreen() {
   // from a falsy cursor (see web DeckView.tsx for the same pattern).
   const engineMode = useRef<'v1' | 'v2' | null>(null);
   const [deckExhausted, setDeckExhausted] = useState(false);
-  const [lastAction, setLastAction] = useState<LastAction | null>(null);
+  // Multi-level undo (spec 40 §4.5) — matches web's MAX_UNDO_STACK-deep
+  // stack (packages/shared/src/constants/tmdb.ts) rather than remembering
+  // only the single most recent action.
+  const [undoStack, setUndoStack] = useState<LastAction[]>([]);
   const [undoing, setUndoing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
@@ -176,14 +179,19 @@ export default function DeckScreen() {
       if (!current) return;
       const prevStatus = current.userStatus ?? 'unwatched';
       const prevReview = current.userReviewStatus ?? 'none';
-      setLastAction({
-        mediaId: current.id,
-        title: current.title,
-        previousStatus: prevStatus,
-        previousReviewStatus: prevReview,
-        previousRejectCount: current.userRejectCount ?? 0,
-        previousHiddenUntil: current.userHiddenUntil ?? null,
-      });
+      setUndoStack((s) =>
+        [
+          {
+            mediaId: current.id,
+            title: current.title,
+            previousStatus: prevStatus,
+            previousReviewStatus: prevReview,
+            previousRejectCount: current.userRejectCount ?? 0,
+            previousHiddenUntil: current.userHiddenUntil ?? null,
+          },
+          ...s,
+        ].slice(0, MAX_UNDO_STACK),
+      );
 
       Haptics.impactAsync(
         action === 'watched' || action === 'unwatched'
@@ -266,6 +274,7 @@ export default function DeckScreen() {
   };
 
   const handleUndo = async () => {
+    const lastAction = undoStack[0];
     if (!lastAction || undoing) return;
     setUndoing(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -288,7 +297,7 @@ export default function DeckScreen() {
       });
       showToast({ message: 'Undo saved offline — will sync when back online', tone: 'warning' });
     } finally {
-      setLastAction(null);
+      setUndoStack((s) => s.slice(1));
       setUndoing(false);
     }
   };
@@ -395,17 +404,17 @@ export default function DeckScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top + space.lg }]}>
       <Text style={styles.hint}>← Haven&apos;t · Watched → · ↑ Watch Later · ↓ Review Later</Text>
-      {lastAction && (
+      {undoStack.length > 0 && (
         <Pressable
           onPress={handleUndo}
           disabled={undoing}
           style={({ pressed }) => [styles.undoButton, pressed && styles.pressed]}
           accessibilityRole="button"
-          accessibilityLabel={`Undo marking ${lastAction.title}`}
+          accessibilityLabel={`Undo marking ${undoStack[0].title}`}
           accessibilityState={{ disabled: undoing }}
         >
           <Text style={styles.undoButtonText}>
-            {undoing ? 'Undoing…' : `↺ Undo "${lastAction.title}"`}
+            {undoing ? 'Undoing…' : `↺ Undo "${undoStack[0].title}"`}
           </Text>
         </Pressable>
       )}
