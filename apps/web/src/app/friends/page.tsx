@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useApiClient } from '@/hooks/useApiClient';
 import { useNotificationsFeed } from '@/hooks/useNotificationsFeed';
 
@@ -17,7 +17,19 @@ interface Friendship {
 
 type Tab = 'friends' | 'incoming' | 'outgoing' | 'blocked';
 
+// useSearchParams() opts a page out of static prerendering unless it's
+// wrapped in Suspense (Next.js build fails otherwise: "should be wrapped
+// in a suspense boundary") — needed for the ?tab=incoming deep link from
+// the notification toast/badge (spec 40 §7).
 export default function FriendsPage() {
+  return (
+    <Suspense fallback={null}>
+      <FriendsPageInner />
+    </Suspense>
+  );
+}
+
+function FriendsPageInner() {
   const client = useApiClient();
   const searchParams = useSearchParams();
   const { markIncomingRead, markFriendshipNotificationsRead } = useNotificationsFeed();
