@@ -155,6 +155,15 @@ export default function ProfileScreen() {
 
       <Pressable
         style={({ pressed }) => [styles.btn, pressed && styles.pressed]}
+        onPress={() => router.push('/about')}
+        accessibilityRole="button"
+        accessibilityLabel="About and TMDB credits"
+      >
+        <Text style={styles.btnText}>About / TMDB Credits</Text>
+      </Pressable>
+
+      <Pressable
+        style={({ pressed }) => [styles.btn, pressed && styles.pressed]}
         onPress={signOut}
         accessibilityRole="button"
         accessibilityLabel="Sign out"
