@@ -110,9 +110,9 @@ Spec [`20`](spec/20-deck-engine-v2.md). Requires Stage 1.
 - [x] **2.6 Background pre-build** — Next.js `after()`. **Verify `after()` works on Vercel first**; if not, use the documented synchronous fallback at item 35.
   *Verify:* a `ready` bucket serves in <150ms p95.
 
-- [ ] **2.7 Wire both clients to buckets** — replace cursor with `bucketId` in `DeckView.tsx` and `apps/mobile/app/(tabs)/deck.tsx`; honour `partial`/`reason`.
+- [x] **2.7 Wire both clients to buckets** — replace cursor with `bucketId` in `DeckView.tsx` and `apps/mobile/app/(tabs)/deck.tsx`; honour `partial`/`reason`.
   *Verify:* filtered deck <800ms; no null-cursor dead end reachable.
-  > Route/server side is done (2.5/2.6) and shipped behind `DECK_ENGINE=v2` (unset in production — v1 unaffected). This item is specifically the *client* UI rewrite: replace `cursor`/`sessionId` state with `bucketId`, request the next bucket when the client crosses item 35, surface `partial`/`reason`. Not started.
+  > Both clients now detect the response shape (`bucketId` present ⇒ v2) and branch accordingly — no separate code path needed per engine, so this is safe to ship even while `DECK_ENGINE` stays unset in prod. Verified end-to-end in a real headless browser (web) against `DECK_ENGINE=v2` locally; mobile got the identical logic but is typecheck-only (no device connected this session — see HANDOFF).
 
 - [ ] **2.8 Retire v1** behind `DECK_ENGINE=v2` after a clean week.
 

@@ -71,11 +71,14 @@ Username + password only. Under the hood, Supabase Auth with a **synthetic email
 
 *Added in Stage 2.3 (`2026-08-13`):* `getTaste()`/`deriveQuotas()` in `apps/web/src/lib/deck/taste.ts` — per-genre/format/classification affinity from `user_media` history, Laplace-smoothed, 180-day recency half-life, cached in `user_taste`. Verified against `rein`'s real history: genre affinities within ±0.03 of the audit's measured table, RPC executes in 10.5ms server-side.
 
-*Added in Stage 2.4-2.6 (`2026-08-13`), behind `DECK_ENGINE=v2` (unset in prod):*
+*Added in Stage 2.4-2.7 (`2026-08-13`) — the whole deck-engine-v2 rewrite, behind `DECK_ENGINE=v2` (unset in prod, so none of this is live for real users yet):*
 - Corpus ingestion (`scripts/ingest-corpus.mjs`) took `media` from 641 to 4,247 non-adult titles — see Session Log for the full breakdown.
-- `apps/web/src/lib/deck/bucket-service.ts` — `buildBucket`/`getReadyBucket`/`markServing`, `get_eligible_media` SQL function, `deck_buckets`/`deck_build_locks` tables. Wired into `GET /api/v1/deck` when `DECK_ENGINE=v2`, currently unset in Vercel so production traffic still runs v1's `generate.ts` unchanged.
+- `apps/web/src/lib/deck/bucket-service.ts` — `buildBucket`/`getReadyBucket`/`markServing`, `get_eligible_media` SQL function, `deck_buckets`/`deck_build_locks` tables. Wired into `GET /api/v1/deck` when `DECK_ENGINE=v2`.
+- Both clients (`DeckView.tsx`, mobile `deck.tsx`) detect which response shape they got and branch — same component, no separate v1/v2 build. Verified end-to-end in a real headless browser for web (multi-bucket advance, filter-change → new bucket, undo, zero console errors); mobile is typecheck-only, no device connected this session.
 - Two real bugs found only by testing (not inspection): cold-start quotas producing 60-item buckets instead of 50, and a `get_eligible_media` query costing 1.24s server-side (fixed to 34.6ms) because genre aggregation ran before the LIMIT instead of after. Both fixed — see Session Log for detail.
 - `after()` background pre-build verified working locally; unverified on an actual Vercel deployment (flag isn't live there).
+
+**Next step is Stage 2.8** (retire v1 after a clean week) — this requires the user's explicit go-ahead before setting `DECK_ENGINE=v2` in Vercel, since it changes what every production user sees on the deck screen. Do not flip that flag unprompted.
 
 *Fixed in Stage 1 (`2026-08-13`):*
 - ~~Series genre coverage 46%~~ — TV genre ids seeded, per-row genre-link inserts (one bad FK no longer drops a title's whole genre set), 236 genre-less rows backfilled from TMDB. **99.6% series / 99.7% movie coverage**, verified live.

@@ -19,9 +19,15 @@ export interface SearchResponse {
 
 export interface DeckResponse {
   items: DeckItem[];
-  cursor: string | null;
-  sessionId: string;
+  // v1 (generate.ts) shape:
+  cursor?: string | null;
+  sessionId?: string;
   message?: string;
+  // v2 (bucket-service.ts) shape — present only when DECK_ENGINE=v2:
+  bucketId?: string;
+  position?: number;
+  partial?: boolean;
+  reason?: 'no_matches_for_filters' | 'corpus_exhausted';
 }
 
 export interface CollectionResponse {

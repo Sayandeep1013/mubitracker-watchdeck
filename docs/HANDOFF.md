@@ -10,20 +10,35 @@ Read after [`CONTEXT.md`](CONTEXT.md). Then work [`IMPLEMENTATION-PLAN.md`](IMPL
 ```
 Read docs/CONTEXT.md, docs/HANDOFF.md, and docs/IMPLEMENTATION-PLAN.md.
 
-Stages 0-1 are shipped, and Stage 2.1-2.6 are done (cooldown + exclusion,
-undo carrying cooldown state, taste model, corpus ingestion, bucket
-service, background pre-build). All of it ships behind `DECK_ENGINE=v2`,
-which is NOT set in Vercel — production is still v1, unaffected.
+Stages 0-1 and Stage 2.1-2.7 are all done — that's the entire deck-engine
+v2 rewrite (cooldown/exclusion, taste model, corpus ingestion, bucket
+service, background pre-build, both clients wired). It ships behind
+`DECK_ENGINE=v2`, which is NOT set in Vercel — production is still v1,
+unaffected, byte-for-byte the same behavior it had before this session.
 
-Continue with 2.7: wire both clients (`DeckView.tsx`,
-`apps/mobile/app/(tabs)/deck.tsx`) to consume `bucketId` instead of
-`cursor`/`sessionId`. The route already returns both shapes depending on
-whether v2 is active (`{bucketId, items, position, partial, reason}` vs
-`{items, cursor, sessionId, message}`), so clients need to branch on which
-fields are present, or the flag needs to be set to test locally
-(`DECK_ENGINE=v2 pnpm --filter @mubitracker/web dev`). Do NOT set
-`DECK_ENGINE=v2` in Vercel until 2.7 is done and tested — that's 2.8's job,
-"after a clean week."
+Continue with 2.8: retire v1 behind the flag after a clean week. Concretely
+that means: (1) set `DECK_ENGINE=v2` in Vercel, (2) watch production for a
+week for `deck_empty`-equivalent failures (there's no analytics yet —
+Stage 5.1 — so this means manually checking Vercel logs / Supabase logs
+for errors on `/api/v1/deck`, and asking the user directly whether the
+deck feels different/broken), (3) only once that week is clean, delete
+`generate.ts` and the `supportsBucketAlgorithm`/engine-branch in
+`route.ts`, and simplify both clients back down to bucket-only logic
+(drop the `engineMode`/cursor fallback paths). Do NOT flip the flag
+without telling the user first — it changes what every production user
+sees on the deck screen, which is exactly the kind of user-visible
+production change that needs a heads-up, not just a green CI run.
+
+Also still open from 2.5-2.7's own verification, worth closing before 2.8:
+- Real production latency (Vercel bom1 ↔ Supabase ap-south-1) is
+  unmeasured — only local-dev-to-Supabase WAN timing exists. Once the flag
+  is on in a preview/staging deploy, re-measure bucket build p95 there.
+- The build lock is best-effort (2/3 concurrent cold requests produced 2
+  builds in testing), not airtight.
+- Mobile's bucket-mode wiring is typecheck-only — no Android device was
+  connected this session to actually drive it (check `adb devices`; if
+  connected, run through `mobile-qa/flows/` or manually swipe with
+  `DECK_ENGINE=v2` set on the dev server the phone points at).
 
 For each item: implement → pnpm typecheck → write/extend its test →
 verify against the acceptance criterion → commit → update the checkbox
@@ -45,7 +60,7 @@ When you finish a stage, update this prompt block and tell me what
 changed.
 ```
 
-**Current position: Stage 1 and Stage 2.1-2.6 shipped (`2026-08-13`), behind `DECK_ENGINE=v2` (unset in prod). Stage 2.7 (client wiring) is next.**
+**Current position: Stage 1 and all of Stage 2 (2.1-2.7) shipped (`2026-08-13`), behind `DECK_ENGINE=v2` (unset in prod — v1 still serves production unchanged). Stage 2.8 (retire v1 after a clean week) is next, and needs the user's go-ahead before flipping the flag.**
 
 ### Pending verification
 
@@ -86,6 +101,18 @@ This is the mechanism that lets a session run without the user in the loop. Foll
 ## Session Log
 
 Newest first. One line per completed item; a block per stage.
+
+### 2026-08-13 — Stage 2.7 (wire both clients to buckets)
+
+Spec [`20`](spec/20-deck-engine-v2.md) §4/§5. Last item of the deck-engine-v2 rewrite proper (2.8 is just the rollout).
+
+| Item | Change |
+|---|---|
+| 2.7 | `DeckResponse` (shared) gained optional `bucketId`/`position`/`partial`/`reason`, and `cursor`/`sessionId` became optional — one type now covers both server shapes. `DeckView.tsx` and mobile `deck.tsx` each got an `engineMode` ref set from the *first* response (`bucketId` present ⇒ `'v2'`) and a `deckExhausted` flag replacing "falsy cursor" as the stop-fetching signal, since bucket mode has no cursor and always has a next request by construction. The prefetch effect branches: v2 requests the next bucket (omitting `bucket=`, per spec 23 §8) once within 15 of the queue's end; v1's existing cursor logic is untouched. `partial`/`reason` surface as the same toast mechanism v1's `message` already used, so no new UI component was needed. |
+
+**Verified in a real headless browser** (Playwright, not just curl) against both modes on the local dev server: **v1** (`pnpm dev`, no flag) — deck renders, keyboard classify advances the counter, undo shows its toast, screenshot confirms correct rendering; zero regressions since v1's code path is behavior-identical to before (`engineMode.current !== 'v2'` evaluates the same as the old unconditional logic). **v2** (`DECK_ENGINE=v2 pnpm dev`) — first bucket (50 items) loads, advancing to item 39 correctly triggered a *second* distinct `bucketId` fetch and appended its items with no visible hiccup; changing a filter (Movies chip) correctly produced a third, different `bucketId` for the new `filterHash` after a ~2-4s cold build; no browser console/page errors in any run.
+
+**Not verified:** mobile's identical logic is typecheck-only — no Android device was connected this session (`adb devices` was empty at session start and never reconnected). The web verification exercises the same shared-package types and the same server responses mobile consumes, so risk is low, but "typechecks" and "verified working on device" are different claims — don't promote this to done-done until it's actually been run on a phone.
 
 ### 2026-08-13 — Stage 2.4-2.6 (corpus ingestion, bucket service, background pre-build)
 

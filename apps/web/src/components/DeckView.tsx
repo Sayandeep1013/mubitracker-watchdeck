@@ -35,6 +35,12 @@ export function DeckView() {
   const [loading, setLoading] = useState(true);
   const [cursor, setCursor] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  // Bucket mode (DECK_ENGINE=v2) has no cursor concept — "more" always
+  // exists by construction (spec 23's whole point is no null-cursor dead
+  // end), so exhaustion is tracked explicitly instead of inferred from a
+  // falsy cursor.
+  const engineMode = useRef<'v1' | 'v2' | null>(null);
+  const [deckExhausted, setDeckExhausted] = useState(false);
   const [filters, setFilters] = useState<DeckFilters>(() =>
     filtersFromSearchParams(new URLSearchParams(searchParams.toString())),
   );
@@ -82,14 +88,37 @@ export function DeckView() {
       const activeSessionId = overrides ? overrides.sessionId : sessionId;
       try {
         const params = deckFiltersToSearchParams(filters);
-        if (activeCursor) params.set('cursor', activeCursor);
-        if (activeSessionId) params.set('session_id', activeSessionId);
+        // Bucket mode never sends cursor/session_id back — the next bucket
+        // is always requested the same way as the first (spec 23 §8:
+        // `bucket` omitted ⇒ serve/build the ready one for this filterHash).
+        if (engineMode.current !== 'v2') {
+          if (activeCursor) params.set('cursor', activeCursor);
+          if (activeSessionId) params.set('session_id', activeSessionId);
+        }
         const data = await client.getDeck(params);
+        if (engineMode.current === null) engineMode.current = data.bucketId ? 'v2' : 'v1';
+
         setQueue((q) => [...q, ...data.items]);
-        setCursor(data.cursor);
-        setSessionId(data.sessionId);
-        if (data.message && data.items.length === 0) {
-          showToast({ message: data.message, tone: 'neutral' });
+        if (engineMode.current === 'v2') {
+          // No cursor to exhaust — track explicitly so the prefetch effect
+          // doesn't hammer the server once the corpus genuinely runs dry.
+          setDeckExhausted(data.items.length === 0 && Boolean(data.reason));
+        } else {
+          setCursor(data.cursor ?? null);
+          setSessionId(data.sessionId ?? null);
+        }
+
+        if (data.items.length === 0) {
+          const message =
+            data.message ??
+            (data.reason === 'no_matches_for_filters'
+              ? 'No titles match these filters. Try broadening your filters.'
+              : data.reason === 'corpus_exhausted'
+                ? "You've caught up — check back later for new titles."
+                : undefined);
+          if (message) showToast({ message, tone: 'neutral' });
+        } else if (data.partial) {
+          showToast({ message: 'Still finding more titles for you…', tone: 'neutral' });
         }
       } catch (e) {
         showToast({
@@ -109,6 +138,8 @@ export function DeckView() {
     setCurrentIndex(0);
     setCursor(null);
     setSessionId(null);
+    setDeckExhausted(false);
+    engineMode.current = null;
     setLoading(true);
     setEntering(true);
     // Pass explicit nulls — cursor/sessionId state resets haven't committed yet,
@@ -117,13 +148,21 @@ export function DeckView() {
   }, [filters]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (currentIndex >= queue.length - 5 && cursor) {
-      fetchBatch();
+    if (fetching.current) return;
+    const nearEnd = currentIndex >= queue.length - 5;
+    if (engineMode.current === 'v2') {
+      // Bucket mode always has a next request by construction (that's the
+      // whole point of spec 23 — no null-cursor dead end) — request the
+      // next bucket well before the current one runs out, unless the last
+      // fetch told us the corpus is genuinely dry.
+      if (currentIndex >= queue.length - 15 && !deckExhausted) fetchBatch();
+      return;
     }
+    if (nearEnd && cursor) fetchBatch();
     if (currentIndex >= DECK_PREFETCH_AT && cursor && queue.length < DECK_PREFETCH_AT + 10) {
       fetchBatch();
     }
-  }, [currentIndex, queue.length, cursor, fetchBatch]);
+  }, [currentIndex, queue.length, cursor, deckExhausted, fetchBatch]);
 
   const advance = useCallback(() => {
     setCurrentIndex((i) => i + 1);

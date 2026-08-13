@@ -27,6 +27,11 @@ export default function DeckScreen() {
   const [index, setIndex] = useState(0);
   const [cursor, setCursor] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  // Bucket mode (DECK_ENGINE=v2) has no cursor — "more" always exists by
+  // construction, so exhaustion is tracked explicitly rather than inferred
+  // from a falsy cursor (see web DeckView.tsx for the same pattern).
+  const engineMode = useRef<'v1' | 'v2' | null>(null);
+  const [deckExhausted, setDeckExhausted] = useState(false);
   const [lastAction, setLastAction] = useState<LastAction | null>(null);
   const [undoing, setUndoing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -44,15 +49,23 @@ export default function DeckScreen() {
     try {
       await syncOfflineQueue();
       const params = new URLSearchParams();
-      if (cursor) params.set('cursor', cursor);
-      if (sessionId) params.set('session_id', sessionId);
+      if (engineMode.current !== 'v2') {
+        if (cursor) params.set('cursor', cursor);
+        if (sessionId) params.set('session_id', sessionId);
+      }
       const data = await apiClient.getDeck(params);
+      if (engineMode.current === null) engineMode.current = data.bucketId ? 'v2' : 'v1';
+
       setQueue((q) => {
         const seen = new Set(q.map((item) => item.id));
         return [...q, ...data.items.filter((item) => !seen.has(item.id))];
       });
-      setCursor(data.cursor);
-      setSessionId(data.sessionId);
+      if (engineMode.current === 'v2') {
+        setDeckExhausted(data.items.length === 0 && Boolean(data.reason));
+      } else {
+        setCursor(data.cursor ?? null);
+        setSessionId(data.sessionId ?? null);
+      }
       setLoadError(null);
     } catch (err) {
       // Only surface the error if we have nothing cached to show instead —
@@ -74,8 +87,13 @@ export default function DeckScreen() {
   }, []);
 
   useEffect(() => {
+    if (fetching.current) return;
+    if (engineMode.current === 'v2') {
+      if (index >= queue.length - 15 && !deckExhausted) loadDeck();
+      return;
+    }
     if (index >= queue.length - 5) loadDeck();
-  }, [index, queue.length, loadDeck]);
+  }, [index, queue.length, deckExhausted, loadDeck]);
 
   const performAction = async (status: 'watched' | 'unwatched', reviewLater = false) => {
     if (!current) return;
