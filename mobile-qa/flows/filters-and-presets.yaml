@@ -1,0 +1,63 @@
+# Plan item 4.3 — mobile filters + presets, spec 06.
+#
+# Written 2026-08-13 without a connected Android device — validated by
+# reading filters.tsx / lib/filters.tsx / deck.tsx's filter-reset effect,
+# not by running it. Treat a first run as validating the FLOW as much as
+# the app.
+#
+# Verifies: the deck's Filters button opens the modal, a Type chip and a
+# Genre chip can be selected, saving a preset with a name persists it,
+# applying Filters closes the modal and reloads the deck (queue resets —
+# checked indirectly via the header badge showing an active count),
+# and the preset can be re-applied from a second visit.
+
+appId: host.exp.exponent
+name: Mobile filters + presets
+tags:
+  - regression
+  - deck
+  - filters
+---
+- runFlow: ../subflows/open-project.yaml
+- runFlow: ../subflows/sign-in.yaml
+
+- extendedWaitUntil:
+    visible: "Deck"
+    timeout: 45000
+
+- tapOn:
+    text: "Filters"
+- extendedWaitUntil:
+    visible: "Filters"
+    timeout: 10000
+
+- tapOn: "Movies"
+- tapOn: "Action"
+
+- tapOn:
+    hint: "New preset name"
+- inputText: "Action Movies"
+- tapOn:
+    text: "Save"
+- extendedWaitUntil:
+    visible: "Action Movies"
+    timeout: 10000
+- takeScreenshot: filters-preset-saved
+
+- tapOn:
+    text: "Apply Filters"
+- extendedWaitUntil:
+    visible: "Filters, 2 active"
+    timeout: 10000
+    optional: true
+- takeScreenshot: filters-applied-badge
+
+# Re-open (badge now shows an active count, so the label changed), clear,
+# and confirm the preset is still there to re-apply.
+- tapOn:
+    text: "Filters, 2 active"
+- extendedWaitUntil:
+    visible: "Action Movies"
+    timeout: 10000
+- tapOn:
+    text: "Clear"

@@ -15,9 +15,10 @@ import Animated, {
   Extrapolation,
 } from 'react-native-reanimated';
 import type { DeckItem, ReviewStatus, WatchStatus } from '@mubitracker/shared';
-import { MAX_UNDO_STACK, tmdbPosterUrl } from '@mubitracker/shared';
+import { MAX_UNDO_STACK, deckFiltersToSearchParams, tmdbPosterUrl } from '@mubitracker/shared';
 import { apiClient } from '@/lib/api';
 import { enqueueOfflineAction, syncOfflineQueue } from '@/lib/offline-queue';
+import { useFilters } from '@/lib/filters';
 import { useToast } from '@/components/Toast';
 import { color, motion, radius, space, type } from '@/lib/theme';
 
@@ -52,6 +53,7 @@ export default function DeckScreen() {
     friend_id?: string;
     friend_mode?: string;
   }>();
+  const { filters } = useFilters();
   const [queue, setQueue] = useState<DeckItem[]>([]);
   const [index, setIndex] = useState(0);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -91,19 +93,24 @@ export default function DeckScreen() {
 
   const current = queue[index];
 
-  const loadDeck = useCallback(async () => {
+  const loadDeck = useCallback(async (overrides?: { cursor: string | null; sessionId: string | null }) => {
     if (fetching.current) return;
     fetching.current = true;
+    // On a filter change the caller passes explicit nulls — cursor/sessionId
+    // state resets haven't committed yet, so reading the closure's `cursor`/
+    // `sessionId` here would still reuse the previous filter set's values.
+    const activeCursor = overrides ? overrides.cursor : cursor;
+    const activeSessionId = overrides ? overrides.sessionId : sessionId;
     try {
       await syncOfflineQueue();
-      const params = new URLSearchParams();
+      const params = deckFiltersToSearchParams(filters);
       if (friendId) {
         params.set('friend_id', friendId);
         if (friendMode) params.set('friend_mode', friendMode);
       }
       if (engineMode.current !== 'v2') {
-        if (cursor) params.set('cursor', cursor);
-        if (sessionId) params.set('session_id', sessionId);
+        if (activeCursor) params.set('cursor', activeCursor);
+        if (activeSessionId) params.set('session_id', activeSessionId);
       }
       const data = await apiClient.getDeck(params);
       if (engineMode.current === null) engineMode.current = data.bucketId ? 'v2' : 'v1';
@@ -132,11 +139,18 @@ export default function DeckScreen() {
       fetching.current = false;
       setInitialLoadDone(true);
     }
-  }, [cursor, sessionId, friendId, friendMode]);
+  }, [cursor, sessionId, friendId, friendMode, filters]);
 
   useEffect(() => {
-    loadDeck();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    setQueue([]);
+    setIndex(0);
+    setCursor(null);
+    setSessionId(null);
+    setDeckExhausted(false);
+    setLoadError(null);
+    engineMode.current = null;
+    loadDeck({ cursor: null, sessionId: null });
+  }, [filters]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (fetching.current) return;

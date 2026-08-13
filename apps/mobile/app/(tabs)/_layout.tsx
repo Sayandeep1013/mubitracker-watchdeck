@@ -2,6 +2,7 @@ import { Feather } from '@expo/vector-icons';
 import { Tabs, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNotifications } from '@/lib/notifications';
+import { useFilters } from '@/lib/filters';
 import { color as themeColor, space } from '@/lib/theme';
 
 type FeatherName = keyof typeof Feather.glyphMap;
@@ -9,6 +10,28 @@ type FeatherName = keyof typeof Feather.glyphMap;
 function TabIcon(name: FeatherName) {
   return ({ color, size }: { color: string; size: number }) => (
     <Feather name={name} color={color} size={size} />
+  );
+}
+
+function DeckHeaderRight() {
+  const router = useRouter();
+  const { activeCount } = useFilters();
+
+  return (
+    <Pressable
+      onPress={() => router.push('/filters')}
+      hitSlop={8}
+      style={styles.headerBtn}
+      accessibilityRole="button"
+      accessibilityLabel={activeCount > 0 ? `Filters, ${activeCount} active` : 'Filters'}
+    >
+      <Feather name="sliders" color={themeColor.text} size={20} />
+      {activeCount > 0 && (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{activeCount > 9 ? '9+' : activeCount}</Text>
+        </View>
+      )}
+    </Pressable>
   );
 }
 
@@ -74,7 +97,10 @@ export default function TabLayout() {
         tabBarInactiveTintColor: themeColor.textMuted,
       }}
     >
-      <Tabs.Screen name="deck" options={{ title: 'Deck', tabBarIcon: TabIcon('layers') }} />
+      <Tabs.Screen
+        name="deck"
+        options={{ title: 'Deck', tabBarIcon: TabIcon('layers'), headerRight: DeckHeaderRight }}
+      />
       <Tabs.Screen name="search" options={{ title: 'Search', tabBarIcon: TabIcon('search') }} />
       <Tabs.Screen
         name="collection"

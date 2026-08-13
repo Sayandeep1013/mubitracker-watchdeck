@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { ToastProvider } from '@/components/Toast';
 import { NotificationsProvider } from '@/lib/notifications';
+import { FiltersProvider } from '@/lib/filters';
 import { color } from '@/lib/theme';
 
 function useAuthGuard() {
@@ -75,16 +76,19 @@ export default function RootLayout() {
           <StatusBar style="light" />
           {checked ? (
             <NotificationsProvider>
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="login" />
-                <Stack.Screen name="review/[id]" options={{ presentation: 'modal' }} />
-                <Stack.Screen name="friends/add" options={{ presentation: 'modal' }} />
-                <Stack.Screen name="friends/notifications" options={{ presentation: 'modal' }} />
-                <Stack.Screen name="friends/[id]" />
-                <Stack.Screen name="watch-later" />
-                <Stack.Screen name="about" />
-              </Stack>
+              <FiltersProvider>
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen name="login" />
+                  <Stack.Screen name="review/[id]" options={{ presentation: 'modal' }} />
+                  <Stack.Screen name="friends/add" options={{ presentation: 'modal' }} />
+                  <Stack.Screen name="friends/notifications" options={{ presentation: 'modal' }} />
+                  <Stack.Screen name="friends/[id]" />
+                  <Stack.Screen name="watch-later" />
+                  <Stack.Screen name="about" />
+                  <Stack.Screen name="filters" options={{ presentation: 'modal' }} />
+                </Stack>
+              </FiltersProvider>
             </NotificationsProvider>
           ) : (
             <View style={styles.splash} accessibilityLabel="Loading Mubitracker">
