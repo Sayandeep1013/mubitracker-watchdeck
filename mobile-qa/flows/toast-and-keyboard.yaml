@@ -1,0 +1,74 @@
+# Plan items 3.3/3.4 — toast component with offline-queue fallback, and
+# KeyboardAvoidingView on the review modal keeping Save reachable.
+#
+# Written 2026-08-13 without a connected Android device — same caveat as
+# deck-gesture-map-and-buttons.yaml: unverified syntax, not just an
+# unverified app.
+#
+# Part 1: airplane mode during a deck swipe should hit the catch branch in
+# performAction (deck.tsx) and show "Saved offline — will sync when back
+# online" via the new ToastProvider, instead of the action silently
+# failing.
+# Part 2: opening the review modal for a queued title and focusing the
+# body TextInput must not push the Save button off-screen under the
+# keyboard — that was spec 31 §3's KeyboardAvoidingView requirement.
+
+appId: host.exp.exponent
+name: Offline toast fires; review modal keyboard doesn't hide Save
+tags:
+  - regression
+  - toast
+  - keyboard
+---
+- runFlow: ../subflows/open-project.yaml
+- runFlow: ../subflows/sign-in.yaml
+
+- extendedWaitUntil:
+    visible: "Deck"
+    timeout: 45000
+
+# --- Part 1: offline toast ---
+- setAirplaneMode: enabled
+- swipe:
+    start: "20%, 50%"
+    end: "85%, 50%"
+    duration: 300
+- extendedWaitUntil:
+    visible: "Saved offline"
+    timeout: 10000
+- assertVisible: "Saved offline"
+- takeScreenshot: offline-queue-toast
+- setAirplaneMode: disabled
+
+# --- Part 2: review modal keyboard handling ---
+# Queue the current card for review, then open it from the Review Later tab.
+- extractTextWithAI:
+    query: "The media title shown on the deck card, exactly as written"
+    outputVariable: reviewTitle
+- swipe:
+    start: "50%, 25%"
+    end: "50%, 70%"
+    duration: 300
+- extendedWaitUntil:
+    visible: "Undo"
+    timeout: 10000
+
+- tapOn: "Review Later"
+- extendedWaitUntil:
+    visible: "${reviewTitle}"
+    timeout: 15000
+- tapOn: "${reviewTitle}"
+
+- tapOn:
+    hint: "Review text"
+- inputText: "A quick QA review body."
+
+# The keyboard is now up — Save must still be tappable, not clipped
+# beneath it.
+- assertVisible: "Save"
+- takeScreenshot: review-modal-save-visible-with-keyboard-open
+- tapOn: "Save"
+
+- extendedWaitUntil:
+    notVisible: "Saving"
+    timeout: 15000

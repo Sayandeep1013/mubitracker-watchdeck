@@ -1,0 +1,97 @@
+# Plan items 3.2/3.5/3.6 — deck gesture map unified with web, plus the
+# fallback button row so no action is gesture-only.
+#
+# Written 2026-08-13 without a connected Android device — validated by
+# reading deck.tsx's accessibilityLabel strings and ACTION_META table, not
+# by running it. Treat a first run as validating the FLOW as much as the
+# app; fix obvious Maestro syntax issues before trusting a failure as a
+# real regression.
+#
+# Verifies, in order: swipe left = Haven't, swipe right = Watched,
+# swipe up = Watch Later, swipe down = Review Later, and finally that the
+# same "Review Later" outcome is reachable with zero gestures via the
+# on-screen button row + Confirm (spec 31 §2's "no action may be
+# gesture-only" rule). Each step checks the Undo pill names the card that
+# was just acted on, which only happens if performAction actually ran.
+
+appId: host.exp.exponent
+name: Deck gesture map matches web; fallback buttons work
+tags:
+  - regression
+  - deck
+---
+- runFlow: ../subflows/open-project.yaml
+- runFlow: ../subflows/sign-in.yaml
+
+- extendedWaitUntil:
+    visible: "Deck"
+    timeout: 45000
+
+# ← Haven't
+- extractTextWithAI:
+    query: "The media title shown on the deck card, exactly as written"
+    outputVariable: titleLeft
+- swipe:
+    start: "85%, 50%"
+    end: "20%, 50%"
+    duration: 300
+- extendedWaitUntil:
+    visible: "Undo"
+    timeout: 10000
+- assertVisible: 'Undo "${titleLeft}"'
+
+# → Watched
+- extractTextWithAI:
+    query: "The media title shown on the deck card, exactly as written"
+    outputVariable: titleRight
+- swipe:
+    start: "20%, 50%"
+    end: "85%, 50%"
+    duration: 300
+- extendedWaitUntil:
+    visible: "Undo"
+    timeout: 10000
+- assertVisible: 'Undo "${titleRight}"'
+
+# ↑ Watch Later
+- extractTextWithAI:
+    query: "The media title shown on the deck card, exactly as written"
+    outputVariable: titleUp
+- swipe:
+    start: "50%, 70%"
+    end: "50%, 25%"
+    duration: 300
+- extendedWaitUntil:
+    visible: "Undo"
+    timeout: 10000
+- assertVisible: 'Undo "${titleUp}"'
+
+# ↓ Review Later
+- extractTextWithAI:
+    query: "The media title shown on the deck card, exactly as written"
+    outputVariable: titleDown
+- swipe:
+    start: "50%, 25%"
+    end: "50%, 70%"
+    duration: 300
+- extendedWaitUntil:
+    visible: "Undo"
+    timeout: 10000
+- assertVisible: 'Undo "${titleDown}"'
+- takeScreenshot: deck-gesture-map-all-four-directions
+
+# Fallback buttons only — no swipe at all. Select "Haven't" via the button
+# row, then commit with Confirm, matching accessibilityLabel strings from
+# deck.tsx's ActionButton / handleConfirm.
+- extractTextWithAI:
+    query: "The media title shown on the deck card, exactly as written"
+    outputVariable: titleButtons
+- tapOn:
+    text: "Select Haven't for ${titleButtons}"
+- tapOn:
+    text: "Confirm Haven't for ${titleButtons}"
+- extendedWaitUntil:
+    visible: "Undo"
+    timeout: 10000
+- assertVisible: 'Undo "${titleButtons}"'
+- takeScreenshot: deck-fallback-buttons-no-gesture

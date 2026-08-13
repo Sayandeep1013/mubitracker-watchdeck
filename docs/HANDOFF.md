@@ -71,15 +71,17 @@ changed.
 
 ### Pending verification
 
-Code-complete but unverified — all need the Android device. Maestro flows already exist for the Stage 0 items; run `maestro test mobile-qa/flows/`. Stage 3 items have no dedicated flows yet — needs a manual pass or new flows before promoting to `[x]`.
+Code-complete but unverified — all need the Android device. Run `maestro test mobile-qa/flows/` (see `mobile-qa/README.md` for the per-flow status table — two flows below are marked "written, never run" and need their very first pass treated with extra suspicion, since an untested Maestro flow can fail on its own syntax as easily as on a real app regression).
 
 | Item | Flow |
 |---|---|
-| 0.1 auth-guard blank screen | `mobile-qa/flows/auth-guard-offline.yaml` |
-| 0.2 tabs never refresh | `mobile-qa/flows/tab-refresh.yaml` |
-| 0.5 undo desync after review-later | `mobile-qa/flows/undo-after-review-later.yaml` |
+| 0.1 auth-guard blank screen | `mobile-qa/flows/auth-guard-offline.yaml` — run and passing |
+| 0.2 tabs never refresh | `mobile-qa/flows/tab-refresh.yaml` — run and passing |
+| 0.5 undo desync after review-later | `mobile-qa/flows/undo-after-review-later.yaml` — run and passing pre-3.6; swipe direction updated for 3.6's gesture-map unification, **not re-run since** |
 | 0.7 mobile error handling | covered incidentally by the above; no dedicated flow yet |
-| 3.1-3.7 mobile UX layer (theme, deck animation/gestures/a11y, toast, safe areas, per-screen states) | none yet — needs manual pass or new Maestro flows; see Session Log entry below for exact scope |
+| 3.2/3.5/3.6 deck gesture map + fallback buttons | `mobile-qa/flows/deck-gesture-map-and-buttons.yaml` — **written, never run** |
+| 3.3/3.4 toast + review-modal keyboard handling | `mobile-qa/flows/toast-and-keyboard.yaml` — **written, never run** |
+| 3.1 theme tokens, 3.7 per-screen states | no dedicated flow — mostly visual; do a manual pass and screenshot each of the 7 screens' loading/empty/error states, log results in the Session Log below |
 
 ---
 
