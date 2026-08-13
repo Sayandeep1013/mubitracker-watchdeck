@@ -10,11 +10,11 @@ import {
 } from '@mubitracker/shared';
 import type { MubitrackerClient } from '@mubitracker/shared';
 import { IconSliders, IconX } from './icons';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface FilterDrawerProps {
   filters: DeckFilters;
-  onApply: (filters: DeckFilters) => void;
+  onApply: (filters: DeckFilters, meta?: { preset: boolean }) => void;
   onClose: () => void;
   client: MubitrackerClient;
 }
@@ -46,8 +46,13 @@ export function FilterDrawer({ filters, onApply, onClose, client }: FilterDrawer
   const [presets, setPresets] = useState<
     { id: string; name: string; filterConfig: Record<string, string[]> }[]
   >([]);
+  // Tracks whether `local` is still exactly what a saved preset produced,
+  // for the `filter_applied.preset` analytics property — any manual toggle
+  // clears it, matching "did the user actually apply a saved preset."
+  const appliedFromPreset = useRef(false);
 
   const toggleArray = <K extends keyof DeckFilters>(key: K, value: string) => {
+    appliedFromPreset.current = false;
     setLocal((prev) => {
       const arr = (prev[key] as string[] | undefined) ?? [];
       const next = arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
@@ -56,6 +61,7 @@ export function FilterDrawer({ filters, onApply, onClose, client }: FilterDrawer
   };
 
   const selectType = (opt: (typeof FILTER_TYPE_OPTIONS)[number]) => {
+    appliedFromPreset.current = false;
     setLocal((prev) => {
       const formats = new Set(prev.format ?? []);
       const classifications = new Set(prev.classification ?? []);
@@ -108,6 +114,7 @@ export function FilterDrawer({ filters, onApply, onClose, client }: FilterDrawer
   };
 
   const applyPreset = (config: Record<string, string[]>) => {
+    appliedFromPreset.current = true;
     setLocal({
       format: config.format as DeckFilters['format'],
       classification: config.classification as DeckFilters['classification'],
@@ -210,7 +217,8 @@ export function FilterDrawer({ filters, onApply, onClose, client }: FilterDrawer
               <button
                 key={era.label}
                 type="button"
-                onClick={() =>
+                onClick={() => {
+                  appliedFromPreset.current = false;
                   setLocal((p) =>
                     eraSelected(era.yearFrom, era.yearTo)
                       ? { ...p, yearFrom: undefined, yearTo: undefined }
@@ -219,8 +227,8 @@ export function FilterDrawer({ filters, onApply, onClose, client }: FilterDrawer
                           yearFrom: era.yearFrom ?? undefined,
                           yearTo: era.yearTo ?? undefined,
                         },
-                  )
-                }
+                  );
+                }}
                 className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
                   eraSelected(era.yearFrom, era.yearTo)
                     ? 'border-red-500/50 bg-red-500/15 text-red-300'
@@ -285,14 +293,14 @@ export function FilterDrawer({ filters, onApply, onClose, client }: FilterDrawer
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => onApply({})}
+            onClick={() => onApply({}, { preset: false })}
             className="flex-1 rounded-lg border border-neutral-700 py-3 text-sm text-neutral-300 hover:bg-neutral-900"
           >
             Clear
           </button>
           <button
             type="button"
-            onClick={() => onApply(local)}
+            onClick={() => onApply(local, { preset: appliedFromPreset.current })}
             className="flex-1 rounded-lg bg-red-600 py-3 text-sm font-medium text-white hover:bg-red-500"
           >
             Apply Filters

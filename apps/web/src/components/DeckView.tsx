@@ -25,6 +25,12 @@ function hasFilterValues(filters: DeckFilters): boolean {
   return Object.values(filters).some((v) => (Array.isArray(v) ? v.length > 0 : v != null && v !== ''));
 }
 
+function filterKeys(filters: DeckFilters): string[] {
+  return Object.entries(filters)
+    .filter(([, v]) => (Array.isArray(v) ? v.length > 0 : v != null && v !== ''))
+    .map(([k]) => k);
+}
+
 export function DeckView() {
   const client = useApiClient();
   const searchParams = useSearchParams();
@@ -57,8 +63,23 @@ export function DeckView() {
   const toastId = useRef(0);
   const busy = useRef(false);
   const urlSynced = useRef(false);
+  // Analytics (spec 50 §6). filtersApplied skips the "filter_applied" event
+  // on the very first [filters] effect run — that run is the initial load,
+  // not a user applying a filter change.
+  const filtersApplied = useRef(false);
+  const batchesServedThisSession = useRef(0);
+  const cardShownAt = useRef(performance.now());
+  const pendingFilterMeta = useRef<{ preset: boolean } | null>(null);
 
   const current = queue[currentIndex];
+
+  // Reset the classification timer whenever a new card becomes current —
+  // covers the initial card, every advance, and undo (which also changes
+  // currentIndex) in one place instead of threading it through each.
+  useEffect(() => {
+    if (current) cardShownAt.current = performance.now();
+  }, [current?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const activeFilterCount = Object.values(filters).filter((v) =>
     Array.isArray(v) ? v.length > 0 : v != null && v !== '',
   ).length;
@@ -82,11 +103,15 @@ export function DeckView() {
   }, []);
 
   const fetchBatch = useCallback(
-    async (overrides?: { cursor: string | null; sessionId: string | null }) => {
+    async (
+      overrides?: { cursor: string | null; sessionId: string | null },
+      reason?: 'initial' | 'filter_change',
+    ) => {
       if (fetching.current) return;
       fetching.current = true;
       const activeCursor = overrides ? overrides.cursor : cursor;
       const activeSessionId = overrides ? overrides.sessionId : sessionId;
+      const fetchStart = performance.now();
       try {
         const params = deckFiltersToSearchParams(filters);
         // Bucket mode never sends cursor/session_id back — the next bucket
@@ -97,6 +122,7 @@ export function DeckView() {
           if (activeSessionId) params.set('session_id', activeSessionId);
         }
         const data = await client.getDeck(params);
+        const latencyMs = Math.round(performance.now() - fetchStart);
         if (engineMode.current === null) engineMode.current = data.bucketId ? 'v2' : 'v1';
 
         setLoadError(null);
@@ -110,7 +136,41 @@ export function DeckView() {
           setSessionId(data.sessionId ?? null);
         }
 
+        batchesServedThisSession.current += 1;
+        const filtered = hasFilterValues(filters);
+        const keys = filterKeys(filters);
+        client.trackEvent({
+          event: 'deck_batch_served',
+          properties: {
+            count: data.items.length,
+            latency_ms: latencyMs,
+            filtered,
+            filter_keys: keys,
+            cursor_null: engineMode.current === 'v1' ? data.cursor == null : false,
+            source: overrides ? 'cold' : 'prefetch',
+          },
+        });
+        if (reason === 'filter_change') {
+          client.trackEvent({
+            event: 'filter_applied',
+            properties: {
+              filter_keys: keys,
+              preset: pendingFilterMeta.current?.preset ?? false,
+              latency_ms: latencyMs,
+              result_count: data.items.length,
+            },
+          });
+        }
+
         if (data.items.length === 0) {
+          client.trackEvent({
+            event: 'deck_empty',
+            properties: {
+              filtered,
+              filter_keys: keys,
+              batches_served_this_session: batchesServedThisSession.current,
+            },
+          });
           const message =
             data.message ??
             (data.reason === 'no_matches_for_filters'
@@ -151,9 +211,14 @@ export function DeckView() {
     engineMode.current = null;
     setLoading(true);
     setEntering(true);
+    batchesServedThisSession.current = 0;
     // Pass explicit nulls — cursor/sessionId state resets haven't committed yet,
     // so the fetchBatch closure would otherwise reuse the previous filter set's values.
-    fetchBatch({ cursor: null, sessionId: null });
+    fetchBatch(
+      { cursor: null, sessionId: null },
+      filtersApplied.current ? 'filter_change' : 'initial',
+    );
+    filtersApplied.current = true;
   }, [filters]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -189,15 +254,22 @@ export function DeckView() {
   }, []);
 
   const performAction = useCallback(
-    async (action: Action) => {
+    async (action: Action, input: 'swipe' | 'key' | 'button' = 'button') => {
       if (!current || busy.current || exitDirection) return;
       busy.current = true;
 
       const title = current.title;
+      const mediaId = current.id;
+      const msSinceCardShown = Math.round(performance.now() - cardShownAt.current);
       const prevStatus = current.userStatus ?? 'unwatched';
       const prevReview = current.userReviewStatus ?? 'none';
       const prevRejectCount = current.userRejectCount ?? 0;
       const prevHiddenUntil = current.userHiddenUntil ?? null;
+
+      client.trackEvent({
+        event: 'media_classified',
+        properties: { media_id: mediaId, status: action, input, ms_since_card_shown: msSinceCardShown, platform: 'web' },
+      });
 
       if (action === 'watched' || action === 'unwatched') {
         stickyAction.current = action;
@@ -262,14 +334,18 @@ export function DeckView() {
     [current, client, advance, exitDirection, showToast],
   );
 
-  const handleConfirm = useCallback(() => {
-    // Only confirm watched/unwatched/review_later/watch_later from button selection
-    performAction(selectedAction);
-  }, [selectedAction, performAction]);
+  const handleConfirm = useCallback(
+    (input: 'key' | 'button' = 'button') => {
+      // Only confirm watched/unwatched/review_later/watch_later from button selection
+      performAction(selectedAction, input);
+    },
+    [selectedAction, performAction],
+  );
 
   const handleUndo = useCallback(async () => {
     const last = undoStack[0];
     if (!last) return;
+    const depth = undoStack.length;
     setUndoStack((s) => s.slice(1));
     setCurrentIndex((i) => Math.max(0, i - 1));
     setEntering(true);
@@ -280,6 +356,10 @@ export function DeckView() {
         previous_review_status: last.previousReviewStatus,
         previous_reject_count: last.previousRejectCount,
         previous_hidden_until: last.previousHiddenUntil,
+      });
+      client.trackEvent({
+        event: 'undo_used',
+        properties: { depth, restored_status: last.previousStatus, platform: 'web' },
       });
       showToast({ message: 'Undone', tone: 'undo' });
     } catch {
@@ -300,13 +380,13 @@ export function DeckView() {
         setSelectedAction('watched');
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        performAction('watch_later');
+        performAction('watch_later', 'key');
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
-        performAction('review_later');
+        performAction('review_later', 'key');
       } else if (e.key === 'Enter') {
         e.preventDefault();
-        handleConfirm();
+        handleConfirm('key');
       } else if (e.key === 'z' || e.key === 'Z') {
         e.preventDefault();
         handleUndo();
@@ -333,11 +413,11 @@ export function DeckView() {
 
   const onTouchEnd = () => {
     if (Math.abs(dragX) > 80) {
-      performAction(dragX > 0 ? 'watched' : 'unwatched');
+      performAction(dragX > 0 ? 'watched' : 'unwatched', 'swipe');
     } else if (dragY < -100) {
-      performAction('watch_later');
+      performAction('watch_later', 'swipe');
     } else if (dragY > 100) {
-      performAction('review_later');
+      performAction('review_later', 'swipe');
     } else {
       setDragX(0);
       setDragY(0);
@@ -375,7 +455,8 @@ export function DeckView() {
         {showFilters && (
           <FilterDrawer
             filters={filters}
-            onApply={(f) => {
+            onApply={(f, meta) => {
+              pendingFilterMeta.current = meta ?? { preset: false };
               setFilters(f);
               setShowFilters(false);
             }}
@@ -428,7 +509,8 @@ export function DeckView() {
         {showFilters && (
           <FilterDrawer
             filters={filters}
-            onApply={(f) => {
+            onApply={(f, meta) => {
+              pendingFilterMeta.current = meta ?? { preset: false };
               setFilters(f);
               setShowFilters(false);
             }}
@@ -485,7 +567,8 @@ export function DeckView() {
       {showFilters && (
         <FilterDrawer
           filters={filters}
-          onApply={(f) => {
+          onApply={(f, meta) => {
+            pendingFilterMeta.current = meta ?? { preset: false };
             setFilters(f);
             setShowFilters(false);
           }}
