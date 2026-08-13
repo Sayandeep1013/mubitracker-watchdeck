@@ -73,7 +73,7 @@ When you finish a stage, update this prompt block and tell me what
 changed.
 ```
 
-**Current position: Stage 1, all of Stage 2 (2.1-2.7), all of Stage 3 (3.1-3.8), and Stage 4.7-4.9 shipped (`2026-08-13`). Deck v2 is behind `DECK_ENGINE=v2` (unset in prod); Stage 2.8 needs the user's go-ahead before flipping the flag. Stage 3.8 and 4.7-4.9 are `[x]`, verified live. Stage 3.1-3.7 (mobile) is `[~]` — code-complete/typecheck-clean but no Android device this session. Next up: the rest of Stage 4 (4.1-4.6, 4.10-4.13) — mobile-only items to be implemented theoretically per the no-device policy, with pending tests recorded for later.**
+**Current position: Stage 1, all of Stage 2 (2.1-2.7), all of Stage 3 (3.1-3.8), and Stage 4.1/4.7-4.9 shipped (`2026-08-13`). Deck v2 is behind `DECK_ENGINE=v2` (unset in prod); Stage 2.8 needs the user's go-ahead before flipping the flag. Stage 3.8 and 4.7-4.9 are `[x]`, verified live; 4.1 is `[~]` (web half verified live, mobile half typecheck-only). Stage 3.1-3.7 (mobile) is `[~]` — code-complete/typecheck-clean but no Android device this session. Next up: 4.2 (mobile friends UI, the largest remaining item), then 4.3-4.6/4.10-4.13 — mobile-only items to be implemented theoretically per the no-device policy, with pending tests recorded for later.**
 
 ### Pending verification
 
@@ -117,6 +117,20 @@ This is the mechanism that lets a session run without the user in the loop. Foll
 ## Session Log
 
 Newest first. One line per completed item; a block per stage.
+
+### 2026-08-13 — Stage 4.1 (privacy settings UI) — `5502a19`
+
+Spec [`40`](spec/40-friends-v2.md) §2, [`32`](spec/32-web-ux.md) §8.
+
+| Item | Change |
+|---|---|
+| Web `/profile` | New Privacy card: `profile_visibility` (Public/Private select), `collection_visibility` and `reviews_visibility` (Public/Friends/Private selects), all optimistic with revert + toast on failure. Copy handle button next to `@username`. |
+| Web `/friends` | One-time nudge banner ("Let people find you by username?" / Make me discoverable / Not now), shown only when `profileVisibility === 'private'` and not previously dismissed (persisted per-user in `localStorage`). Also gained its own Copy handle button (spec 40 §2's "always-available path"). |
+| Mobile Profile | Same Public/Private segmented toggle and Copy handle button, using a new `expo-clipboard` dependency (added via `pnpm --filter mobile add`). Mobile's first-run nudge is deferred to 4.2 — there's no mobile Friends screen yet to put it on. |
+
+**Verified live** in a real headless browser (fresh signup, `context.grantPermissions(['clipboard-read','clipboard-write'])` so the clipboard assertions are real, not stubbed): profile/collection visibility changes persist across reload (confirmed via explicit `waitForResponse` on the PATCH, not a timeout guess — an earlier fixed-delay version of this test was flaky for exactly the reason you'd expect); the nudge shows only while private and stays dismissed after "Not now" + reload; Copy handle round-trips through the real clipboard on both pages; zero console/page errors. Found and fixed one real gap while verifying: both `copyHandle` handlers had no error handling, so a clipboard permission failure (the actual first behavior seen in headless Chromium before granting permissions) would fail completely silently — wrapped both in try/catch with user-facing feedback (toast on `/profile`, inline error on `/friends`).
+
+**Not verified:** mobile's identical toggle/copy UI is typecheck-clean only — no Android device connected this session.
 
 ### 2026-08-13 — Stage 4.7-4.9 (friend-deck modes, unblock, duplicate-request guard) — `5b77a2c`
 
