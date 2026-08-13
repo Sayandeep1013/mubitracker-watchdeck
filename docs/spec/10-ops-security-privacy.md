@@ -69,6 +69,10 @@ About/Credits page must include:
 
 ## Analytics
 
+> Superseded by [`50-pipeline.md`](50-pipeline.md) §6 — the actual implemented event set,
+> property schemas, and server-side logging contract. This section is kept for the original
+> product-metrics intent only.
+
 Product metrics only (no PII):
 - deck_started, media_classified, watch_action, filter_used, undo_used
 - Aggregate: avg classification interval, titles per session
@@ -90,11 +94,17 @@ Not in MVP.
 
 ## CI (Phase 0)
 
+> Superseded by [`50-pipeline.md`](50-pipeline.md) §3 (`.github/workflows/ci.yml` stages) and §8
+> (release & rollback). This section is kept for the original Phase-0 intent only.
+
 - `pnpm lint`
 - `pnpm typecheck`
 - `pnpm test` (unit tests for normalization, filters)
 
 ## Monitoring (Future)
+
+> Superseded by [`50-pipeline.md`](50-pipeline.md) §6 (structured logs, `x-request-id`, error
+> reporter, alert thresholds) — no longer "Future," implemented per that spec.
 
 - Vercel analytics
 - Supabase dashboard for DB health

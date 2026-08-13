@@ -1,7 +1,10 @@
 # Mubitracker — Task List
 
-> Status as of **2026-08-12**. Update this file as tasks complete.
-> See [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) for full project background.
+> **Superseded 2026-08-14 (spec 50 §5.7 docs refresh).** Frozen as of **2026-08-12** and not
+> updated since — most items below shipped in Stages 0-4 and this file was never ticked
+> alongside them. **Current backlog:** [`IMPLEMENTATION-PLAN.md`](IMPLEMENTATION-PLAN.md), tracked
+> stage-by-stage with verified/unverified status per item. Kept only for archaeology.
+> See [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md) for the equivalent note on that file.
 
 ---
 

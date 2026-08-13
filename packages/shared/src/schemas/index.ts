@@ -57,12 +57,6 @@ export const friendRequestSchema = z.object({
   user_id: z.string().uuid().optional(),
 });
 
-export const recommendationSchema = z.object({
-  receiver_id: z.string().uuid(),
-  media_id: z.string().uuid(),
-  message: z.string().max(500).optional(),
-});
-
 export const undoSchema = z.object({
   media_id: z.string().uuid(),
   previous_status: z.enum(['watched', 'unwatched', 'watch_later']),

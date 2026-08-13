@@ -1,5 +1,14 @@
 # Mubitracker (MubiTracker) — Project Context Guide
 
+> **Superseded 2026-08-14 (spec 50 §5.7 docs refresh).** This file is frozen as a historical
+> snapshot of the project's initial scaffold (2026-08-12) and is **not** kept in sync with the
+> live system anymore — several claims below are stale (11 subspecs → now 23; 2 migrations
+> applied → now 17; "no git repo" → repo + CI have been live since 2026-08-12; Expo mobile
+> "scaffolded" → SDK 54, feature-complete through Stage 4). **Current source of truth:**
+> [`CONTEXT.md`](CONTEXT.md) (state) → [`HANDOFF.md`](HANDOFF.md) (session log) →
+> [`IMPLEMENTATION-PLAN.md`](IMPLEMENTATION-PLAN.md) (what's next). Read those instead; this file
+> and [`TASKLIST.md`](TASKLIST.md) are kept only for archaeology.
+
 ## Handoff for Next Chat
 
 Start a new chat and attach **both** files:

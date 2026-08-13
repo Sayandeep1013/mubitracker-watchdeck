@@ -7,10 +7,10 @@ import type {
   FriendsResponse,
   ImportResult,
   PendingReviewsResponse,
-  RecommendationsResponse,
   ReviewsResponse,
   SearchResponse,
 } from './types/api.js';
+import type { AnalyticsEvent } from './types/analytics.js';
 import type { Profile, Review } from './types/user.js';
 import type {
   CreateReviewInput,
@@ -228,22 +228,15 @@ export class MubitrackerClient {
     return this.fetch<Profile>(`/api/v1/friends/${id}/profile`);
   }
 
-  getFriendCollection(id: string, params?: URLSearchParams) {
-    const qs = params?.toString();
-    return this.fetch<CollectionResponse>(
-      `/api/v1/friends/${id}/collection${qs ? `?${qs}` : ''}`,
-    );
-  }
-
   compareWithFriend(id: string) {
     return this.fetch<CompareResponse>(`/api/v1/friends/${id}/compare`);
   }
 
-  getRecommendations() {
-    return this.fetch<RecommendationsResponse>('/api/v1/recommendations');
-  }
-
-  sendRecommendation(body: { receiver_id: string; media_id: string; message?: string }) {
-    return this.fetch('/api/v1/recommendations', { method: 'POST', body: JSON.stringify(body) });
+  /** Fire-and-forget: analytics must never break the UX it's measuring. */
+  trackEvent(event: AnalyticsEvent): void {
+    this.fetch('/api/v1/analytics/events', {
+      method: 'POST',
+      body: JSON.stringify(event),
+    }).catch(() => {});
   }
 }

@@ -4,7 +4,6 @@ import type {
   FilterPreset,
   Friendship,
   Profile,
-  Recommendation,
   Review,
 } from './user.js';
 
@@ -66,7 +65,6 @@ export interface ImportResult {
 }
 
 export type FriendsResponse = Friendship[];
-export type RecommendationsResponse = Recommendation[];
 export type PendingReviewsResponse = (MediaSummary & { reviewStatus: string })[];
 export type FilterPresetsResponse = FilterPreset[];
 export type CompareResponse = CollectionComparison;

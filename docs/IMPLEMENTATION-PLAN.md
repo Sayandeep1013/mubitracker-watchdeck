@@ -182,8 +182,10 @@ Spec [`50`](spec/50-pipeline.md).
 - [ ] **5.4 TMDB caching** — none exists; the 35ms per-instance gate is meaningless on serverless.
 - [ ] **5.5 Staging Supabase** — local/preview/prod all share one project today; preview deploys write production data.
 - [ ] **5.6 Test-data cleanup** — `wqa*`/`mqa*` accounts accumulate.
-- [ ] **5.7 Docs refresh** — `PROJECT_CONTEXT.md` / `TASKLIST.md` claim 11 specs (14), 2 migrations (5), "no git repo" (repo+CI live), "Expo SDK 52 scaffolded" (SDK 54).
-- [ ] **5.8 Dead code** — `GET_MEDIA` (not an HTTP verb, ignored by Next), unreachable `/recommendations`, `/friends/[id]/collection`, `/friends/[id]/profile`.
+- [x] **5.7 Docs refresh** — `PROJECT_CONTEXT.md` / `TASKLIST.md` claim 11 specs (14), 2 migrations (5), "no git repo" (repo+CI live), "Expo SDK 52 scaffolded" (SDK 54).
+  > Both files carry a superseded banner pointing at `CONTEXT.md`/`HANDOFF.md`/`IMPLEMENTATION-PLAN.md` instead of being rewritten to track live state — a second parallel set of "current" docs would just drift again. Spec 10's Analytics/CI/Monitoring sections gained pointers to spec 50, which now supersedes them.
+- [x] **5.8 Dead code** — `GET_MEDIA` (not an HTTP verb, ignored by Next), unreachable `/recommendations`, `/friends/[id]/collection`, `/friends/[id]/profile`.
+  > Verified reachability by grepping every client call site before deleting anything, not by trusting the audit's list verbatim — it was stale on one entry. `GET_MEDIA` in `search/route.ts` removed (Next only recognizes exported HTTP-verb names; this function was never invoked — identical logic already lives in `media/[id]/route.ts`). `/api/v1/recommendations` and `/api/v1/friends/[id]/collection` routes deleted along with their now-orphaned client methods (`getRecommendations`, `sendRecommendation`, `getFriendCollection`), the `RecommendationsResponse` type, and `recommendationSchema`. **`/friends/[id]/profile` is NOT dead** — Stage 4.2 wired it up (`apps/mobile/app/friends/[id].tsx:28` calls `apiClient.getFriendProfile`), after this audit item was written; left untouched. `recommendations`/`friendships` DB tables and `canViewCollection` (still used by `compareCollections`) were left alone — this item is about unreachable application code, not a schema migration. `pnpm typecheck` clean across all 3 packages.
 - [ ] **5.9 Migration filename convention** — `20250812*` ×4 vs `20260812*` ×1 breaks lexical ordering; document forward-only convention.
 
 ---
