@@ -56,8 +56,9 @@ Username + password only. Under the hood, Supabase Auth with a **synthetic email
 
 **Known broken** — full list with evidence in [`AUDIT-2026-08-12.md`](AUDIT-2026-08-12.md). Status as of Stage 1 (`2026-08-13`):
 
-*Still broken — Stage 2.3 on:*
+*Still broken — Stage 2.4 on:*
 - The deck engine can only reach **~400 titles**; a heavy account (283 tracked) has effectively exhausted it. (Stage 2.4 corpus ingestion — candidates still come from live TMDB discover, not a queryable local corpus, until then.)
+- Deck serving is still **taste-blind** — `getTaste`/`deriveQuotas` exist (Stage 2.3) but nothing calls them yet; that's Stage 2.5's job. A user who rejects 90% of live-action series still gets served them at the same rate as before.
 - One under-filled batch **permanently kills** the deck (null cursor → clients stop prefetching). (Stage 2.5–2.7 bucket service.)
 - Mobile has **no friends UI at all**, no filters, no Watch Later, gesture-only actions, zero accessibility labels. (Stages 3–4.)
 
@@ -67,6 +68,8 @@ Username + password only. Under the hood, Supabase Auth with a **synthetic email
 - Undo (`POST /api/v1/user-media/undo`) now carries and restores `previous_reject_count`/`previous_hidden_until` — both clients capture them from the deck item at swipe time.
 
 *Known limitation carried into 2.1 (not a defect, will resolve itself in 2.5):* candidates still come from live, randomly-paged TMDB discover calls, not an indexed local corpus. Exclusion/cooldown correctness was verified directly (DB state, escalation math, watched-never-reappears), but "does an explicit `status=unwatched` filter re-surface one specific previously-rejected title" is architecturally probabilistic until Stage 2.5 queries the corpus directly instead of re-rolling random TMDB pages.
+
+*Added in Stage 2.3 (`2026-08-13`), not yet consumed:* `getTaste()`/`deriveQuotas()` in `apps/web/src/lib/deck/taste.ts` — per-genre/format/classification affinity from `user_media` history, Laplace-smoothed, 180-day recency half-life, cached in `user_taste`. Verified against `rein`'s real history: genre affinities within ±0.03 of the audit's measured table, RPC executes in 10.5ms server-side. Nothing calls this yet — Stage 2.5 (bucket service) is where it starts actually shaping what gets served.
 
 *Fixed in Stage 1 (`2026-08-13`):*
 - ~~Series genre coverage 46%~~ — TV genre ids seeded, per-row genre-link inserts (one bad FK no longer drops a title's whole genre set), 236 genre-less rows backfilled from TMDB. **99.6% series / 99.7% movie coverage**, verified live.

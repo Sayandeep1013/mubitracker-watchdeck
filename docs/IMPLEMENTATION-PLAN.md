@@ -98,7 +98,7 @@ Spec [`20`](spec/20-deck-engine-v2.md). Requires Stage 1.
 - [x] **2.2 Undo carries cooldown state** — extend `POST /api/v1/user-media/undo` with prior `reject_count`/`hidden_until`.
   *Verify:* three mis-swipes + three undos leave the title eligible.
 
-- [ ] **2.3 Taste model** — spec [`22`](spec/22-taste-model.md). `user_taste` table, smoothing, 180-day recency half-life, <50-decision cold start.
+- [x] **2.3 Taste model** — spec [`22`](spec/22-taste-model.md). `user_taste` table, smoothing, 180-day recency half-life, <50-decision cold start.
   *Verify:* `rein`'s computed affinity reproduces the measured table ±0.05.
 
 - [ ] **2.4 Corpus ingestion** — spec [`21`](spec/21-corpus-ingestion.md). `scripts/ingest-corpus.mjs`, ~150 TMDB calls → ~3,000 titles.
