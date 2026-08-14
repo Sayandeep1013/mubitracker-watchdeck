@@ -36,18 +36,12 @@ interface LastAction {
 
 const ACTION_META: Record<
   Action,
-  {
-    label: string;
-    shortLabel: string;
-    icon: keyof typeof Feather.glyphMap;
-    tint: string;
-    dir: ExitDirection;
-  }
+  { label: string; icon: keyof typeof Feather.glyphMap; tint: string; dir: ExitDirection }
 > = {
-  unwatched: { label: "Haven't", shortLabel: "Haven't", icon: 'x', tint: color.danger, dir: 'left' },
-  watched: { label: 'Watched', shortLabel: 'Watched', icon: 'check', tint: color.success, dir: 'right' },
-  watch_later: { label: 'Watch Later', shortLabel: 'Later', icon: 'clock', tint: color.warning, dir: 'up' },
-  review_later: { label: 'Review Later', shortLabel: 'Review', icon: 'bookmark', tint: color.review, dir: 'down' },
+  unwatched: { label: "Haven't", icon: 'x', tint: color.danger, dir: 'left' },
+  watched: { label: 'Watched', icon: 'check', tint: color.success, dir: 'right' },
+  watch_later: { label: 'Watch Later', icon: 'clock', tint: color.warning, dir: 'up' },
+  review_later: { label: 'Review Later', icon: 'bookmark', tint: color.review, dir: 'down' },
 };
 
 function hasFilterValues(filters: ReturnType<typeof useFilters>['filters']): boolean {
@@ -60,27 +54,13 @@ function filterKeys(filters: ReturnType<typeof useFilters>['filters']): string[]
     .map(([k]) => k);
 }
 
-// Was a flat 220x330 (a strict 2:3 ratio) regardless of device size — small
-// on every screen and didn't scale up on bigger phones. Width now scales
-// with the actual screen so it isn't needlessly small on wider devices.
-//
-// Height is NOT a fixed multiple of that width — an earlier version used a
-// flat 1.72 ratio and it overlapped the action buttons on this exact device
-// (confirmed live via screenshot: "Detective Conan" / "1996 · Anime"
-// rendering on top of the Watched/Later buttons — there just wasn't enough
-// screen height left after the hint text, title, meta, and button row for a
-// poster that tall). Fixed instead with `flex: 1` on posterWrap below: the
-// poster fills whatever vertical space is actually left after its fixed-size
-// siblings, capped by POSTER_MAX_HEIGHT so it doesn't grow unbounded on a
-// very tall/short-content screen. Same principle as the web deck card's
-// dvh-based clamp, just expressed as RN flexbox instead of a CSS clamp().
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const POSTER_WIDTH = Math.min(SCREEN_WIDTH * 0.7, 300);
-// Raised from 1.72 after removing the Undo banner row (now a small corner
-// chip on the poster itself, see below) freed up real vertical room — the
-// cap can afford to be taller without reintroducing the overlap this ratio
-// caused before.
-const POSTER_MAX_HEIGHT = Math.round(POSTER_WIDTH * 2.05);
+// The poster is the entire screen now (full-bleed, edge to edge) — the
+// Deck tab's header is transparent (see (tabs)/_layout.tsx) so there's no
+// separate solid bar pushing content down first. HEADER_ALLOWANCE is how
+// far our own overlays (the gesture hint, the Undo chip) need to sit below
+// the status bar before they clear the hamburger/Filters icons floating in
+// that transparent header band.
+const HEADER_ALLOWANCE = 64;
 
 export default function DeckScreen() {
   const insets = useSafeAreaInsets();
@@ -109,7 +89,6 @@ export default function DeckScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [imdbLoading, setImdbLoading] = useState(false);
-  const stickyAction = useRef<Action>('unwatched');
   const [exitDirection, setExitDirection] = useState<ExitDirection | null>(null);
 
   const tx = useSharedValue(0);
@@ -319,11 +298,10 @@ export default function DeckScreen() {
   );
 
   const commitExit = useCallback(
-    (action: Action, input: 'swipe' | 'button' = 'button') => {
+    (action: Action, input: 'swipe' | 'button' = 'swipe') => {
       if (!current || busy.current) return;
       busy.current = true;
       busyShared.value = true;
-      if (action === 'watched' || action === 'unwatched') stickyAction.current = action;
       setExitDirection(ACTION_META[action].dir);
       cueLatched.value = false;
 
@@ -461,14 +439,14 @@ export default function DeckScreen() {
   if (!current) {
     if (!initialLoadDone) {
       return (
-        <View style={[styles.center, { paddingTop: insets.top }]} accessibilityLabel="Loading deck">
+        <View style={[styles.center, { paddingTop: insets.top + HEADER_ALLOWANCE }]} accessibilityLabel="Loading deck">
           <Text style={styles.muted}>Loading deck…</Text>
         </View>
       );
     }
     if (loadError) {
       return (
-        <View style={[styles.center, { paddingTop: insets.top }]}>
+        <View style={[styles.center, { paddingTop: insets.top + HEADER_ALLOWANCE }]}>
           <Text style={styles.errorText}>{loadError}</Text>
           <Pressable
             style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
@@ -486,7 +464,7 @@ export default function DeckScreen() {
       );
     }
     return (
-      <View style={[styles.center, { paddingTop: insets.top }]}>
+      <View style={[styles.center, { paddingTop: insets.top + HEADER_ALLOWANCE }]}>
         <Text style={styles.muted}>No titles match — try again later</Text>
       </View>
     );
@@ -494,117 +472,139 @@ export default function DeckScreen() {
 
   const poster = tmdbPosterUrl(current.posterPath, 'deck');
 
+  // Solely gesture-driven by design (no button fallback) — the hint text
+  // below is the one piece of UI carrying that entire burden, which is why
+  // it's brighter/bolder than a typical caption instead of the usual quiet
+  // mnemonic row.
   return (
-    <View style={[styles.container, { paddingTop: insets.top + space.sm }]}>
-      <Text style={styles.hint}>← Haven&apos;t · Watched → · ↑ Watch Later · ↓ Review Later</Text>
-
+    <View style={styles.container}>
       <GestureDetector gesture={pan}>
-        <Animated.View style={[styles.card, cardStyle]}>
-          <View style={styles.posterWrap}>
-            {poster ? (
-              <Image source={{ uri: poster }} style={styles.poster} />
-            ) : (
-              <View style={[styles.poster, styles.posterPlaceholder]} />
-            )}
-            <Animated.View style={[styles.cue, styles.cueRight, rightCueStyle]} pointerEvents="none">
-              <Feather name="check" size={64} color={color.success} />
-            </Animated.View>
-            <Animated.View style={[styles.cue, styles.cueLeft, leftCueStyle]} pointerEvents="none">
-              <Feather name="x" size={64} color={color.danger} />
-            </Animated.View>
-            <Animated.View style={[styles.cue, styles.cueUp, upCueStyle]} pointerEvents="none">
-              <Feather name="clock" size={64} color={color.warning} />
-            </Animated.View>
-            <Animated.View style={[styles.cue, styles.cueDown, downCueStyle]} pointerEvents="none">
-              <Feather name="bookmark" size={64} color={color.review} />
-            </Animated.View>
-            {/* Undo used to be a full-width pill ABOVE the poster — read as a
-                primary action when it's actually a rare, secondary utility.
-                A small corner chip over the poster itself (like a photo
-                app's undo toast) keeps it reachable without claiming its
-                own row or competing with the poster for attention. */}
-            {undoStack.length > 0 && (
-              <Pressable
-                onPress={handleUndo}
-                disabled={undoing}
-                hitSlop={hitSlopFor(32)}
-                style={({ pressed }) => [styles.undoChip, pressed && styles.pressed]}
-                accessibilityRole="button"
-                accessibilityLabel={`Undo marking ${undoStack[0].title}`}
-                accessibilityState={{ disabled: undoing }}
-              >
-                <Feather name="rotate-ccw" size={13} color={color.text} />
-                <Text style={styles.undoChipText}>{undoing ? 'Undoing…' : 'Undo'}</Text>
-              </Pressable>
-            )}
+        <Animated.View style={[styles.fullCard, cardStyle]}>
+          {poster ? (
+            <Image source={{ uri: poster }} style={styles.fullPoster} resizeMode="cover" />
+          ) : (
+            <View style={[styles.fullPoster, styles.posterPlaceholder]} />
+          )}
+
+          {/* Tinder-style verdict stamps for the two most common actions —
+              a rotated bordered badge in the corner the card is heading
+              toward, fading in with drag distance, instead of the old
+              full-poster color wash + giant centered icon. */}
+          <Animated.View
+            style={[
+              styles.stamp,
+              { top: insets.top + HEADER_ALLOWANCE + 80, left: space.lg, borderColor: color.success, transform: [{ rotate: '-12deg' }] },
+              rightCueStyle,
+            ]}
+            pointerEvents="none"
+          >
+            <Feather name="check" size={22} color={color.success} />
+            <Text style={[styles.stampText, { color: color.success }]}>WATCHED</Text>
+          </Animated.View>
+          <Animated.View
+            style={[
+              styles.stamp,
+              { top: insets.top + HEADER_ALLOWANCE + 80, right: space.lg, borderColor: color.danger, transform: [{ rotate: '12deg' }] },
+              leftCueStyle,
+            ]}
+            pointerEvents="none"
+          >
+            <Feather name="x" size={22} color={color.danger} />
+            <Text style={[styles.stampText, { color: color.danger }]}>HAVEN&apos;T</Text>
+          </Animated.View>
+          <Animated.View style={[styles.cue, styles.cueUp, upCueStyle]} pointerEvents="none">
+            <Feather name="clock" size={56} color={color.warning} />
+          </Animated.View>
+          <Animated.View style={[styles.cue, styles.cueDown, downCueStyle]} pointerEvents="none">
+            <Feather name="bookmark" size={56} color={color.review} />
+          </Animated.View>
+
+          {/* Gesture hint — the only instruction for a solely gesture-driven
+              screen, so it's deliberately more prominent than a normal
+              caption (bigger, bolder, brighter) instead of easy to miss. */}
+          <View style={[styles.hintWrap, { top: insets.top + HEADER_ALLOWANCE }]} pointerEvents="none">
+            <Text style={styles.hint}>← Haven&apos;t</Text>
+            <Text style={styles.hint}>↑ Watch Later</Text>
+            <Text style={styles.hint}>↓ Review Later</Text>
+            <Text style={styles.hint}>Watched →</Text>
           </View>
-          <Text style={styles.title}>{current.title}</Text>
-          <Text style={styles.meta}>
-            {current.year ?? '—'} · {current.displayType}
-          </Text>
+
+          {/* Undo used to be a full-width pill ABOVE the poster — read as a
+              primary action when it's actually a rare, secondary utility.
+              A small corner chip below the header icons keeps it reachable
+              without claiming its own row or competing with the poster. */}
+          {undoStack.length > 0 && (
+            <Pressable
+              onPress={handleUndo}
+              disabled={undoing}
+              hitSlop={hitSlopFor(32)}
+              style={({ pressed }) => [
+                styles.undoChip,
+                { top: insets.top + HEADER_ALLOWANCE + 40 },
+                pressed && styles.pressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={`Undo marking ${undoStack[0].title}`}
+              accessibilityState={{ disabled: undoing }}
+            >
+              <Feather name="rotate-ccw" size={13} color={color.text} />
+              <Text style={styles.undoChipText}>{undoing ? 'Undoing…' : 'Undo'}</Text>
+            </Pressable>
+          )}
+
+          {/* Title/meta/IMDb overlay the bottom of the poster on a
+              translucent panel instead of living in blank space below it —
+              the poster fills the whole screen, so this IS the bottom of
+              the page. */}
+          <View style={[styles.bottomPanel, { paddingBottom: insets.bottom + space.lg }]}>
+            <Text style={styles.title}>{current.title}</Text>
+            <Text style={styles.meta}>
+              {current.year ?? '—'} · {current.displayType}
+            </Text>
+            <Pressable
+              onPress={openImdb}
+              disabled={imdbLoading}
+              hitSlop={12}
+              style={styles.imdbHit}
+              accessibilityRole="link"
+              accessibilityLabel={`Open ${current.title} on IMDb`}
+            >
+              <Text style={styles.imdbLink}>{imdbLoading ? 'Opening…' : 'IMDb ↗'}</Text>
+            </Pressable>
+          </View>
         </Animated.View>
       </GestureDetector>
-
-      <Pressable
-        onPress={openImdb}
-        disabled={imdbLoading}
-        hitSlop={12}
-        style={styles.imdbHit}
-        accessibilityRole="link"
-        accessibilityLabel={`Open ${current.title} on IMDb`}
-      >
-        <Text style={styles.imdbLink}>{imdbLoading ? 'Opening…' : 'IMDb ↗'}</Text>
-      </Pressable>
-
-      {/* Each button commits immediately on tap — no separate select-then-
-          Confirm step. Matches the swipe gestures, which already commit
-          directly; having buttons work differently was the inconsistency. */}
-      <View style={[styles.actionsRow, { paddingBottom: insets.bottom + space.xs }]}>
-        <ActionButton action="unwatched" onPress={commitExit} title={current.title} disabled={!!exitDirection} />
-        <ActionButton action="watched" onPress={commitExit} title={current.title} disabled={!!exitDirection} />
-        <ActionButton action="watch_later" onPress={commitExit} title={current.title} disabled={!!exitDirection} />
-        <ActionButton action="review_later" onPress={commitExit} title={current.title} disabled={!!exitDirection} />
-      </View>
     </View>
   );
 }
 
-function ActionButton({
-  action,
-  onPress,
-  title,
-  disabled,
-}: {
-  action: Action;
-  onPress: (a: Action, input?: 'swipe' | 'button') => void;
-  title: string;
-  disabled?: boolean;
-}) {
-  const meta = ACTION_META[action];
-  return (
-    <Pressable
-      onPress={() => onPress(action, 'button')}
-      disabled={disabled}
-      style={({ pressed }) => [styles.actionBtn, (pressed || disabled) && styles.pressed]}
-      accessibilityRole="button"
-      accessibilityLabel={`${meta.label} — ${title}`}
-      accessibilityState={{ disabled }}
-    >
-      <Feather name={meta.icon} size={18} color={meta.tint} />
-      <Text style={[styles.actionBtnText, { color: meta.tint }]}>{meta.shortLabel}</Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: color.bg, alignItems: 'center', paddingHorizontal: space.lg },
+  container: { flex: 1, backgroundColor: color.bg },
   center: { flex: 1, backgroundColor: color.bg, alignItems: 'center', justifyContent: 'center', padding: space.xl },
-  hint: { color: color.textMuted, fontSize: type.caption.fontSize, marginBottom: space.xs, textAlign: 'center' },
+  fullCard: { ...StyleSheet.absoluteFillObject },
+  fullPoster: { ...StyleSheet.absoluteFillObject },
+  posterPlaceholder: { backgroundColor: color.surfaceHigh },
+  hintWrap: {
+    position: 'absolute',
+    left: space.lg,
+    right: space.lg,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: space.sm,
+  },
+  hint: {
+    color: color.text,
+    fontSize: type.label.fontSize,
+    fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.85)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
+  },
   pressed: { opacity: 0.7 },
   undoChip: {
     position: 'absolute',
-    top: space.sm,
-    right: space.sm,
+    right: space.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -626,41 +626,33 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   retryText: { color: color.text, fontWeight: '600' },
-  card: { alignItems: 'center', width: '100%', flex: 1 },
-  posterWrap: {
-    width: POSTER_WIDTH,
-    flex: 1,
-    minHeight: 180,
-    maxHeight: POSTER_MAX_HEIGHT,
-    borderRadius: radius.md,
-    overflow: 'hidden',
-    marginBottom: space.md,
-  },
-  poster: { width: '100%', height: '100%' },
-  posterPlaceholder: { backgroundColor: color.surfaceHigh },
   cue: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  cueRight: { backgroundColor: `${color.success}33` },
-  cueLeft: { backgroundColor: `${color.danger}33` },
   cueUp: { backgroundColor: `${color.warning}33` },
   cueDown: { backgroundColor: `${color.review}33` },
-  title: { color: color.text, ...type.title, textAlign: 'center' },
-  meta: { color: color.textMuted, fontSize: type.body.fontSize, marginTop: space.xs },
-  imdbHit: { minHeight: 44, justifyContent: 'center', marginTop: space.xs },
-  imdbLink: { color: color.textMuted, fontSize: type.caption.fontSize, fontWeight: '600' },
-  // One compact row of 4 icon-first buttons (was two rows + a separate
-  // Confirm bar) — each commits on tap now, so this is a toolbar, not a
-  // selection UI, and doesn't need the vertical space the old layout used.
-  actionsRow: { flexDirection: 'row', gap: space.xs, width: '100%', marginTop: space.sm },
-  actionBtn: {
-    flex: 1,
+  stamp: {
+    position: 'absolute',
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-    minHeight: 52,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: color.border,
+    gap: 6,
+    borderWidth: 3,
+    borderRadius: radius.sm,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(9,9,11,0.45)',
   },
-  actionBtnText: { fontSize: type.caption.fontSize, fontWeight: '600' },
+  stampText: { fontSize: type.label.fontSize, fontWeight: '800', letterSpacing: 0.5 },
+  bottomPanel: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: space.lg,
+    paddingTop: space.xxl,
+    backgroundColor: 'rgba(9,9,11,0.6)',
+  },
+  title: { color: color.text, ...type.title, textAlign: 'center' },
+  meta: { color: color.textMuted, fontSize: type.body.fontSize, marginTop: space.xs, textAlign: 'center' },
+  imdbHit: { minHeight: 32, alignItems: 'center', justifyContent: 'center', marginTop: space.xs },
+  imdbLink: { color: color.textMuted, fontSize: type.caption.fontSize, fontWeight: '600' },
   muted: { color: color.textMuted },
 });

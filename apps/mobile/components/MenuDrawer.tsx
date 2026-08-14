@@ -17,6 +17,7 @@ interface MenuItem {
   label: string;
   href: '/(tabs)/review-later' | '/(tabs)/friends' | '/watch-later' | '/about';
   icon: FeatherName;
+  tint: string;
   badge?: number;
 }
 
@@ -51,10 +52,10 @@ export function MenuDrawer() {
   const backdropStyle = useAnimatedStyle(() => ({ opacity: backdropOpacity.value }));
 
   const items: MenuItem[] = [
-    { label: 'Review Later', href: '/(tabs)/review-later', icon: 'bookmark' },
-    { label: 'Friends', href: '/(tabs)/friends', icon: 'users', badge: unreadCount },
-    { label: 'Watch Later', href: '/watch-later', icon: 'clock' },
-    { label: 'About', href: '/about', icon: 'info' },
+    { label: 'Review Later', href: '/(tabs)/review-later', icon: 'bookmark', tint: color.review },
+    { label: 'Friends', href: '/(tabs)/friends', icon: 'users', tint: color.friends, badge: unreadCount },
+    { label: 'Watch Later', href: '/watch-later', icon: 'clock', tint: color.warning },
+    { label: 'About', href: '/about', icon: 'info', tint: color.info },
   ];
 
   return (
@@ -82,11 +83,17 @@ export function MenuDrawer() {
               close();
               router.push(item.href);
             }}
-            style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+            style={({ pressed }) => [
+              styles.row,
+              { borderLeftColor: item.tint },
+              pressed && styles.pressed,
+            ]}
             accessibilityRole="button"
             accessibilityLabel={item.label}
           >
-            <Feather name={item.icon} size={20} color={color.text} />
+            <View style={[styles.iconBadge, { backgroundColor: `${item.tint}26` }]}>
+              <Feather name={item.icon} size={18} color={item.tint} />
+            </View>
             <Text style={styles.rowText}>{item.label}</Text>
             {!!item.badge && (
               <View style={styles.badge}>
@@ -121,11 +128,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.md,
-    minHeight: 52,
+    minHeight: 56,
     borderRadius: radius.md,
+    borderLeftWidth: 3,
     paddingHorizontal: space.md,
     backgroundColor: color.surface,
     marginBottom: space.sm,
+  },
+  iconBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   pressed: { opacity: 0.7 },
   rowText: { color: color.text, fontSize: type.body.fontSize, fontWeight: '600', flex: 1 },

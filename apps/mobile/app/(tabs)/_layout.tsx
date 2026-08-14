@@ -113,9 +113,21 @@ export default function TabLayout() {
         tabBarInactiveTintColor: themeColor.textMuted,
       }}
     >
+      {/* The poster is the whole page here — headerTransparent means the
+          header bar itself has no background, and the screen's own content
+          isn't pushed down to make room for it, so the poster renders full
+          height with the hamburger and Filters icons floating on top of it
+          at their usual spot instead of sitting on a separate solid bar
+          above it. */}
       <Tabs.Screen
         name="deck"
-        options={{ title: 'Deck', tabBarIcon: TabIcon('layers'), headerRight: DeckHeaderRight }}
+        options={{
+          title: 'Deck',
+          headerTransparent: true,
+          headerTitle: '',
+          tabBarIcon: TabIcon('layers'),
+          headerRight: DeckHeaderRight,
+        }}
       />
       <Tabs.Screen name="search" options={{ title: 'Search', tabBarIcon: TabIcon('search') }} />
       <Tabs.Screen
@@ -150,7 +162,17 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   headerButtons: { flexDirection: 'row', gap: space.lg, marginRight: space.lg },
-  headerBtn: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  // The translucent circle keeps these legible over any poster art on Deck
+  // (its header has no background of its own anymore) without looking out
+  // of place on the other screens' solid header bars.
+  headerBtn: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
   badge: {
     position: 'absolute',
     top: 2,
