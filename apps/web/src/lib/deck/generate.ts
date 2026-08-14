@@ -392,6 +392,33 @@ export function decodeCursor(raw: string | null): DeckCursor | null {
   }
 }
 
+/** Spec 50 §7's TMDB-down fallback for v1's discover loop. Not genre-aware
+ * (would need a `media_genres` join) — format + classification is enough
+ * to keep the deck alive and roughly on-topic during an outage; precision
+ * degrading briefly is an acceptable trade against a 500. */
+async function getLocalFallbackCandidates(
+  supabase: SupabaseClient,
+  format: MediaFormat,
+  filters: ParsedDeckFilters,
+  excludeIds: Set<string>,
+  limit: number,
+) {
+  let query = supabase
+    .from('media')
+    .select('*')
+    .eq('format', format)
+    .order('popularity', { ascending: false })
+    .limit(limit + excludeIds.size);
+  if (filters.classification?.length) {
+    query = query.in('classification', filters.classification);
+  }
+  const { data } = await query;
+  return (data ?? [])
+    .filter((row) => !excludeIds.has(row.id))
+    .slice(0, limit)
+    .map((row) => toMediaSummary(asDbMedia(row)));
+}
+
 export async function generateDeck(
   supabase: SupabaseClient,
   userId: string,
@@ -436,10 +463,23 @@ export async function generateDeck(
   while (items.length < limit && attempts < maxPages) {
     attempts++;
     const tmdbParams = buildTmdbParams(filters, format);
-    const tmdbStart = Date.now();
-    const discovered = await tmdbDiscover(format, page, tmdbParams);
-    tmdbMs += Date.now() - tmdbStart;
-    const upserted = await upsertMediaBatch(supabase, discovered);
+    let upserted;
+    try {
+      const tmdbStart = Date.now();
+      const discovered = await tmdbDiscover(format, page, tmdbParams);
+      tmdbMs += Date.now() - tmdbStart;
+      upserted = await upsertMediaBatch(supabase, discovered);
+    } catch (e) {
+      // Spec 50 §7: the deck survives TMDB being down instead of 500-ing —
+      // fall back to whatever the corpus already has locally. `media` is
+      // populated continuously by every prior discover/search this app has
+      // ever done (Stage 2.4's ingest script plus organic upserts), so this
+      // is a real, if smaller, candidate pool rather than an empty one.
+      console.warn(
+        `[deck] TMDB unreachable, using local media fallback: ${e instanceof Error ? e.message : e}`,
+      );
+      upserted = await getLocalFallbackCandidates(supabase, format, filters, shownIds, limit);
+    }
 
     const pageIds = upserted.map((m) => m.id);
     const [stateMap, impressed] = await Promise.all([

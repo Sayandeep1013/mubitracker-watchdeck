@@ -4,6 +4,7 @@ import {
   type NormalizedMedia,
   TMDB_API_BASE,
 } from '@mubitracker/shared';
+import { createSupabaseAdminClient } from '@/lib/supabase/server';
 
 interface TmdbResult {
   id: number;
@@ -26,7 +27,8 @@ interface TmdbResult {
 }
 
 let lastRequestTime = 0;
-const MIN_INTERVAL_MS = 35; // ~30 req/s cap
+const MIN_INTERVAL_MS = 35; // ~30 req/s cap — best-effort per-instance smoothing;
+// tmdb_rate_limit_acquire() below is the real, shared-across-instances budget.
 
 async function rateLimitedFetch(url: string, init?: RequestInit): Promise<Response> {
   const now = Date.now();
@@ -37,8 +39,9 @@ async function rateLimitedFetch(url: string, init?: RequestInit): Promise<Respon
   const start = Date.now();
   const res = await fetch(url, init);
   const ms = Date.now() - start;
-  // Spec 50 §6 structured log — `cached` is always false until 5.4's TMDB
-  // cache lands; every call today is a real network round-trip.
+  // Spec 50 §6 structured log. This function only ever runs on a genuine
+  // cache miss (see cachedTmdbRequest), so `cached` is always false here —
+  // the `cached:true` line for a hit is logged by the caller instead.
   console.log(
     JSON.stringify({
       evt: 'tmdb.call',
@@ -91,6 +94,114 @@ function getTmdbInit(): RequestInit {
   return { headers };
 }
 
+// --- Caching / in-flight dedup / rate limiting (spec 50 §7) ---------------
+
+/** One promise per (instance, cache key) in flight at a time — concurrent
+ * identical requests within this instance share one network call instead
+ * of each independently hitting TMDB. */
+const inFlight = new Map<string, Promise<unknown>>();
+
+/** Never includes `api_key` — this key is what gets persisted to
+ * `tmdb_cache`, and the cache table must never hold a secret. */
+function cacheKeyFor(path: string, params: Record<string, string>): string {
+  const qs = Object.entries(params)
+    .filter(([k]) => k !== 'api_key')
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}=${v}`)
+    .join('&');
+  return qs ? `${path}?${qs}` : path;
+}
+
+async function readCache(cacheKey: string): Promise<unknown | null> {
+  try {
+    const supabase = createSupabaseAdminClient();
+    const { data } = await supabase
+      .from('tmdb_cache')
+      .select('response')
+      .eq('cache_key', cacheKey)
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle();
+    return data?.response ?? null;
+  } catch {
+    return null; // the cache is an optimization, never a hard dependency
+  }
+}
+
+async function writeCache(cacheKey: string, response: unknown, ttlSeconds: number): Promise<void> {
+  try {
+    const supabase = createSupabaseAdminClient();
+    await supabase.from('tmdb_cache').upsert({
+      cache_key: cacheKey,
+      response: response as never,
+      expires_at: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
+    });
+  } catch {
+    // best-effort — a failed cache write shouldn't fail the request that
+    // already got its data
+  }
+}
+
+/** Replaces the old per-instance 35ms sleep, which was meaningless on
+ * serverless (N concurrent instances each kept their own timer, so the
+ * real aggregate rate was never actually bounded). Fails open: if the RPC
+ * itself errors, proceed anyway rather than let a rate-limiter outage take
+ * the deck down with it. */
+async function acquireRateSlot(): Promise<void> {
+  try {
+    const supabase = createSupabaseAdminClient();
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const { data, error } = await supabase.rpc('tmdb_rate_limit_acquire');
+      if (error || data) return;
+      const backoffMs = 150 * (attempt + 1) + Math.random() * 100;
+      await new Promise((r) => setTimeout(r, backoffMs));
+    }
+  } catch {
+    // fail open
+  }
+}
+
+/** Cached + deduped + rate-limited TMDB GET. On a cache hit, no network
+ * call and no rate-limit slot are consumed at all. */
+async function cachedTmdbRequest<T>(
+  path: string,
+  params: Record<string, string>,
+  ttlSeconds: number,
+): Promise<T> {
+  const cacheKey = cacheKeyFor(path, params);
+
+  const cached = await readCache(cacheKey);
+  if (cached !== null) {
+    console.log(JSON.stringify({ evt: 'tmdb.call', path, ms: 0, status: 200, cached: true }));
+    return cached as T;
+  }
+
+  const existing = inFlight.get(cacheKey);
+  if (existing) return existing as Promise<T>;
+
+  const promise = (async () => {
+    await acquireRateSlot();
+    const url = buildTmdbUrl(path, params);
+    const res = await rateLimitedFetch(url, getTmdbInit());
+    if (!res.ok) throw new Error(`TMDB ${path} failed: ${res.status}`);
+    const json = await res.json();
+    await writeCache(cacheKey, json, ttlSeconds);
+    return json;
+  })();
+
+  inFlight.set(cacheKey, promise);
+  try {
+    return (await promise) as T;
+  } finally {
+    inFlight.delete(cacheKey);
+  }
+}
+
+const TTL_DISCOVER_SECONDS = 6 * 3600;
+const TTL_DETAILS_SECONDS = 24 * 3600;
+const TTL_SEARCH_SECONDS = 15 * 60;
+
+// ---------------------------------------------------------------------------
+
 function normalizeTmdbItem(item: TmdbResult, format: MediaFormat): NormalizedMedia {
   const isMovie = format === 'movie';
   const title = (isMovie ? item.title : item.name) ?? 'Unknown';
@@ -124,14 +235,12 @@ function normalizeTmdbItem(item: TmdbResult, format: MediaFormat): NormalizedMed
 }
 
 export async function tmdbSearch(query: string, limit = 20): Promise<NormalizedMedia[]> {
-  const url = buildTmdbUrl('/search/multi', {
-    query,
-    include_adult: 'false',
-    page: '1',
-  });
-  const res = await rateLimitedFetch(url, getTmdbInit());
-  if (!res.ok) throw new Error(`TMDB search failed: ${res.status}`);
-  const data = (await res.json()) as { results: TmdbResult[] };
+  const params = { query, include_adult: 'false', page: '1' };
+  const data = await cachedTmdbRequest<{ results: TmdbResult[] }>(
+    '/search/multi',
+    params,
+    TTL_SEARCH_SECONDS,
+  );
   const results: NormalizedMedia[] = [];
   for (const item of data.results) {
     if (item.media_type === 'movie') results.push(normalizeTmdbItem(item, 'movie'));
@@ -153,10 +262,11 @@ export async function tmdbDiscover(
     page: String(page),
     ...params,
   };
-  const url = buildTmdbUrl(`/${endpoint}`, searchParams);
-  const res = await rateLimitedFetch(url, getTmdbInit());
-  if (!res.ok) throw new Error(`TMDB discover failed: ${res.status}`);
-  const data = (await res.json()) as { results: TmdbResult[] };
+  const data = await cachedTmdbRequest<{ results: TmdbResult[] }>(
+    `/${endpoint}`,
+    searchParams,
+    TTL_DISCOVER_SECONDS,
+  );
   return data.results.map((item) => normalizeTmdbItem(item, format));
 }
 
@@ -165,10 +275,11 @@ export async function tmdbGetDetails(
   format: MediaFormat,
 ): Promise<NormalizedMedia> {
   const endpoint = format === 'movie' ? `movie/${providerId}` : `tv/${providerId}`;
-  const url = buildTmdbUrl(`/${endpoint}`);
-  const res = await rateLimitedFetch(url, getTmdbInit());
-  if (!res.ok) throw new Error(`TMDB details failed: ${res.status}`);
-  const item = (await res.json()) as TmdbResult & { genres?: { id: number }[] };
+  const item = await cachedTmdbRequest<TmdbResult & { genres?: { id: number }[] }>(
+    `/${endpoint}`,
+    {},
+    TTL_DETAILS_SECONDS,
+  );
   const normalized = normalizeTmdbItem(item, format);
   if (item.genres) normalized.genreIds = item.genres.map((g) => g.id);
   return normalized;
@@ -179,10 +290,11 @@ export async function tmdbGetExternalIds(
   format: MediaFormat,
 ): Promise<{ imdbId: string | null }> {
   const endpoint = format === 'movie' ? `movie/${providerId}/external_ids` : `tv/${providerId}/external_ids`;
-  const url = buildTmdbUrl(`/${endpoint}`);
-  const res = await rateLimitedFetch(url, getTmdbInit());
-  if (!res.ok) throw new Error(`TMDB external_ids failed: ${res.status}`);
-  const data = (await res.json()) as { imdb_id?: string | null };
+  const data = await cachedTmdbRequest<{ imdb_id?: string | null }>(
+    `/${endpoint}`,
+    {},
+    TTL_DETAILS_SECONDS,
+  );
   return { imdbId: data.imdb_id ?? null };
 }
 

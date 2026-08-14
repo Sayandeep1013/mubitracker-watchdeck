@@ -611,6 +611,42 @@ export type Database = {
           },
         ]
       }
+      tmdb_cache: {
+        Row: {
+          cache_key: string
+          created_at: string
+          expires_at: string
+          response: Json
+        }
+        Insert: {
+          cache_key: string
+          created_at?: string
+          expires_at: string
+          response: Json
+        }
+        Update: {
+          cache_key?: string
+          created_at?: string
+          expires_at?: string
+          response?: Json
+        }
+        Relationships: []
+      }
+      tmdb_rate_limit: {
+        Row: {
+          request_count: number
+          window_start: string
+        }
+        Insert: {
+          request_count?: number
+          window_start: string
+        }
+        Update: {
+          request_count?: number
+          window_start?: string
+        }
+        Relationships: []
+      }
       user_media: {
         Row: {
           created_at: string
@@ -736,6 +772,7 @@ export type Database = {
           year: number
         }[]
       }
+      tmdb_rate_limit_acquire: { Args: { p_budget?: number }; Returns: boolean }
     }
     Enums: {
       media_classification:
