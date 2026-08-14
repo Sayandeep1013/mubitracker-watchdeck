@@ -60,7 +60,7 @@ tags:
 - tapOn: "${reviewTitle}"
 
 - tapOn:
-    hint: "Review text"
+    text: "Review text"
 - inputText: "A quick QA review body."
 
 # The keyboard is now up — Save must still be tappable, not clipped

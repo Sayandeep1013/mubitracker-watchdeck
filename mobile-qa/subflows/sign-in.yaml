@@ -21,15 +21,27 @@ appId: host.exp.exponent
 
       - tapOn: "Need an account? Sign up"
 
+      # `hint:` is not a valid Maestro selector key (confirmed live —
+      # "Unknown Property: hint" aborts the flow before any command runs).
+      # An empty TextInput's placeholder is exposed as its `text` for
+      # matching purposes, same as the login form's own fields.
       - tapOn:
-          hint: "Username"
+          text: "Username"
       - inputText: ${output.user}
-      - hideKeyboard
+      # Not always dismissable on this Gboard config ("Couldn't hide the
+      # keyboard" aborted the flow live) - optional since it's a nicety;
+      # tapping the next field/button works fine with it still open.
+      - hideKeyboard:
+          optional: true
 
       - tapOn:
-          hint: "Password"
+          text: "Password"
       - inputText: "TestPass123!"
-      - hideKeyboard
+      # Not always dismissable on this Gboard config ("Couldn't hide the
+      # keyboard" aborted the flow live) - optional since it's a nicety;
+      # tapping the next field/button works fine with it still open.
+      - hideKeyboard:
+          optional: true
 
       # Google Password Manager can appear over the form.
       - tapOn:

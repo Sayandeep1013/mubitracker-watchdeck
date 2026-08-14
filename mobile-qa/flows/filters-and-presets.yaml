@@ -35,7 +35,7 @@ tags:
 - tapOn: "Action"
 
 - tapOn:
-    hint: "New preset name"
+    text: "New preset name"
 - inputText: "Action Movies"
 - tapOn:
     text: "Save"

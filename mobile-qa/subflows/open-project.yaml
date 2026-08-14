@@ -1,9 +1,21 @@
-# Opens the Mubitracker project inside Expo Go.
+# Opens the Mubitracker project inside Expo Go via manual dev-server URL
+# entry, not the "Recently opened" list this used to tap.
 #
-# `am start -d exp://…` silently fails depending on Expo Go's state, so this
-# goes through the launcher and the "Recently opened" entry instead, which is
-# reliable. Metro must already be running.
-
+# That list only has an entry once Expo Go has connected to this exact
+# project successfully before — a fresh/cleared Expo Go install (any CI
+# runner, or a device after `adb shell pm clear host.exp.exponent`) has
+# nothing there to tap. Confirmed by an actual run, not a guess: on this
+# session's very first live device run, the "Recently opened" entry
+# instead tried to fetch a *published* update from a stale cached
+# reference ("Uncaught Error: java.io.IOException: Failed to download
+# remote update") instead of connecting to the current local Metro
+# instance, and the app got stuck on Expo Go's own error screen —
+# exactly the risk flagged in HANDOFF.md before this was ever run.
+# Manually entering the dev server URL is unconditionally correct: it
+# always targets whatever Metro is actually listening on right now,
+# with no dependency on prior connection history.
+#
+# Metro must already be running before this flow executes.
 appId: host.exp.exponent
 ---
 - launchApp:
@@ -11,11 +23,14 @@ appId: host.exp.exponent
     stopApp: true
 
 - extendedWaitUntil:
-    visible: "Mubitracker"
-    timeout: 30000
+    visible: "Enter URL manually"
+    timeout: 15000
 
-# Tapping the "Recently opened" row reconnects to the dev server.
-- tapOn: "Mubitracker"
+- tapOn: "Enter URL manually"
+- tapOn:
+    below: "Enter URL manually"
+- inputText: "exp://127.0.0.1:8081"
+- pressKey: Enter
 
 # First load bundles from scratch; allow generous time before deciding it hung.
 - extendedWaitUntil:

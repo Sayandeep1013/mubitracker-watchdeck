@@ -64,7 +64,7 @@ tags:
     visible: "Add a friend"
     timeout: 10000
 - tapOn:
-    hint: "Search public profiles"
+    text: "Search public profiles"
 - inputText: "mq"
 - extendedWaitUntil:
     visible: "Add"
