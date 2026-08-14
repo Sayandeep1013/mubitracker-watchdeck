@@ -412,7 +412,7 @@ export default function DeckScreen() {
               accessibilityLabel={`Undo marking ${undoStack[0].title}`}
               accessibilityState={{ disabled: undoing }}
             >
-              <Feather name="rotate-ccw" size={15} color={color.text} />
+              <Feather name="rotate-ccw" size={15} color={color.primary} />
               <Text style={styles.headerUndoText}>{undoing ? 'Undoing…' : 'Undo'}</Text>
             </Pressable>
           )}
@@ -702,17 +702,22 @@ const styles = StyleSheet.create({
   // the component body, not rendered here directly, but styled here
   // alongside everything else on this screen.
   headerRightRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginRight: space.sm },
+  // Deep-black-and-red instead of a flat gray/black block — confirmed live
+  // the solid surfaceHigh fill read as a stray dark blob in the header,
+  // same complaint as the hamburger's old background circle.
   headerUndoBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     minHeight: 36,
-    backgroundColor: color.surfaceHigh,
+    backgroundColor: 'rgba(239,68,68,0.12)',
+    borderWidth: 1,
+    borderColor: color.primary,
     borderRadius: radius.pill,
     paddingVertical: 6,
     paddingHorizontal: 10,
   },
-  headerUndoText: { color: color.text, fontSize: type.caption.fontSize, fontWeight: '600' },
+  headerUndoText: { color: color.primary, fontSize: type.caption.fontSize, fontWeight: '700' },
   headerBtn: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   headerBadge: {
     position: 'absolute',

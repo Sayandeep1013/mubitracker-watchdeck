@@ -1,6 +1,5 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { BlurView } from 'expo-blur';
 import { useEffect } from 'react';
 import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -18,7 +17,6 @@ interface MenuItem {
   label: string;
   href: '/(tabs)/review-later' | '/(tabs)/friends' | '/watch-later' | '/about';
   icon: FeatherName;
-  tint: string;
   badge?: number;
 }
 
@@ -53,10 +51,10 @@ export function MenuDrawer() {
   const backdropStyle = useAnimatedStyle(() => ({ opacity: backdropOpacity.value }));
 
   const items: MenuItem[] = [
-    { label: 'Review Later', href: '/(tabs)/review-later', icon: 'bookmark', tint: color.review },
-    { label: 'Friends', href: '/(tabs)/friends', icon: 'users', tint: color.friends, badge: unreadCount },
-    { label: 'Watch Later', href: '/watch-later', icon: 'clock', tint: color.warning },
-    { label: 'About', href: '/about', icon: 'info', tint: color.info },
+    { label: 'Review Later', href: '/(tabs)/review-later', icon: 'bookmark' },
+    { label: 'Friends', href: '/(tabs)/friends', icon: 'users', badge: unreadCount },
+    { label: 'Watch Later', href: '/watch-later', icon: 'clock' },
+    { label: 'About', href: '/about', icon: 'info' },
   ];
 
   return (
@@ -76,12 +74,10 @@ export function MenuDrawer() {
         pointerEvents={isOpen ? 'auto' : 'none'}
         style={[styles.drawer, { width: DRAWER_WIDTH }, drawerStyle]}
       >
-        {/* Frosted glass instead of a solid fill — blurs whatever's behind
-            the drawer (the current screen's own content, already dimmed by
-            the backdrop above), with a dark scrim on top so the menu stays
-            legible regardless of what that content is. */}
-        <BlurView intensity={70} tint="dark" style={StyleSheet.absoluteFill} />
-        <View style={styles.drawerScrim} />
+        {/* Deep black + red, matching Profile's own look (its segmented
+            control / primary button both use the same solid color.bg +
+            color.primary language) — swapped back from a glass/blur
+            treatment per explicit preference. */}
         <View style={[styles.drawerContent, { paddingTop: insets.top + space.lg }]}>
           <Text style={styles.title}>Menu</Text>
           {items.map((item) => (
@@ -91,16 +87,12 @@ export function MenuDrawer() {
                 close();
                 router.push(item.href);
               }}
-              style={({ pressed }) => [
-                styles.row,
-                { borderLeftColor: item.tint },
-                pressed && styles.pressed,
-              ]}
+              style={({ pressed }) => [styles.row, pressed && styles.pressed]}
               accessibilityRole="button"
               accessibilityLabel={item.label}
             >
-              <View style={[styles.iconBadge, { backgroundColor: `${item.tint}26` }]}>
-                <Feather name={item.icon} size={18} color={item.tint} />
+              <View style={styles.iconBadge}>
+                <Feather name={item.icon} size={18} color={color.primary} />
               </View>
               <Text style={styles.rowText}>{item.label}</Text>
               {!!item.badge && (
@@ -121,25 +113,22 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
-  // No backgroundColor here — the BlurView + drawerScrim provide the
-  // actual fill now; this is just the frame (position/size/edge/shadow).
+  // Deep black — matches Profile's own container background exactly
+  // (color.bg), not a translucent/blurred fill.
   drawer: {
     position: 'absolute',
     top: 0,
     left: 0,
     bottom: 0,
-    overflow: 'hidden',
+    backgroundColor: color.bg,
     borderRightWidth: 1,
-    borderRightColor: 'rgba(255,255,255,0.14)',
+    borderRightColor: color.border,
     elevation: 16,
   },
-  drawerScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(9,9,11,0.45)' },
   drawerContent: { flex: 1, paddingHorizontal: space.lg },
   title: { color: color.text, ...type.headline, marginBottom: space.lg },
-  // Rows stay a solid-ish surface (not further blurred) so the actual
-  // tappable targets keep firm contrast against the glass panel behind
-  // them — full translucency reads well for the panel itself, less so
-  // for text-bearing controls a person needs to read at a glance.
+  // Same surface + red-left-border language as Profile's own cards/
+  // segmented control, applied uniformly (not a different hue per row).
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -147,8 +136,9 @@ const styles = StyleSheet.create({
     minHeight: 56,
     borderRadius: radius.md,
     borderLeftWidth: 3,
+    borderLeftColor: color.primary,
     paddingHorizontal: space.md,
-    backgroundColor: 'rgba(39,39,42,0.72)',
+    backgroundColor: color.surface,
     marginBottom: space.sm,
   },
   iconBadge: {
@@ -157,6 +147,7 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(239,68,68,0.15)',
   },
   pressed: { opacity: 0.7 },
   rowText: { color: color.text, fontSize: type.body.fontSize, fontWeight: '600', flex: 1 },

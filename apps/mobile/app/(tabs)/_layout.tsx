@@ -1,6 +1,5 @@
 import { Feather } from '@expo/vector-icons';
 import { Tabs, useRouter } from 'expo-router';
-import { BlurView } from 'expo-blur';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNotifications } from '@/lib/notifications';
 import { useFilters } from '@/lib/filters';
@@ -140,9 +139,14 @@ export default function TabLayout() {
                 shadowOpacity: 0,
               }
             : { backgroundColor: themeColor.bg, borderTopColor: themeColor.border },
-          tabBarBackground: isDeck
-            ? () => <BlurView intensity={45} tint="dark" style={StyleSheet.absoluteFill} />
-            : undefined,
+          // No BlurView of its own here anymore — confirmed live it created
+          // a visible seam right above the tab bar, because Deck's own
+          // screen content already has a full-bleed blurred backdrop
+          // extending behind this exact region (see deck.tsx); adding a
+          // second BlurView on top double-blurred just that strip, which
+          // reads as a different tone than the single-blurred area above
+          // it. `tabBarStyle`'s transparent background is enough on its
+          // own — the one blur layer already underneath shows through.
           tabBarActiveTintColor: themeColor.text,
           tabBarInactiveTintColor: themeColor.textMuted,
         };
@@ -185,16 +189,15 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   headerButtons: { flexDirection: 'row', gap: space.lg, marginRight: space.lg },
-  // The translucent circle keeps these legible over any poster art on Deck
-  // (its header has no background of its own anymore) without looking out
-  // of place on the other screens' solid header bars.
+  // No background circle — confirmed live it read as a stray dark blob
+  // floating over the header, not an intentional part of the design. The
+  // icon's own white/red color is legible enough against both the solid
+  // headers (Search/Collection/Profile) and Deck's darkened blur backdrop.
   headerBtn: {
     minWidth: 44,
     minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 22,
-    backgroundColor: 'rgba(0,0,0,0.35)',
   },
   badge: {
     position: 'absolute',
