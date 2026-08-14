@@ -64,9 +64,24 @@ function useAuthGuard() {
   useEffect(() => {
     if (!checked) return;
     const inLogin = segments[0] === 'login';
+    // There's no `app/index.tsx`, so a cold launch with no deep link (or an
+    // unrecognized/stale path) resolves to expo-router's built-in Unmatched
+    // Route screen, not any segment we own — confirmed live as the app
+    // getting stuck on "Unmatched Route" after a fresh install that still
+    // carried over a persisted session (`adb install -r` keeps app data).
+    // The old `authed && inLogin` check only ever rescued someone off the
+    // login screen, so an authed user landing anywhere else unrecognized
+    // (root, unmatched) was never sent home. Recognize every top-level
+    // segment this Stack actually declares, and treat anything outside
+    // that set as "needs to be routed home" instead of just "login".
+    const inApp =
+      segments[0] === '(tabs)' ||
+      segments[0] === 'review' ||
+      segments[0] === 'friends' ||
+      segments[0] === 'filters';
     if (!authed && !inLogin) {
       router.replace('/login');
-    } else if (authed && inLogin) {
+    } else if (authed && !inApp) {
       router.replace('/(tabs)/deck');
     }
   }, [checked, authed, segments, router]);
