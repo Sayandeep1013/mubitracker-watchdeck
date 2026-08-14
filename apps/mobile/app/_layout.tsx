@@ -22,27 +22,32 @@ function useAuthGuard() {
   useEffect(() => {
     let mounted = true;
 
-    // getUser() (not getSession()) round-trips to Supabase, so a token whose
-    // underlying account no longer exists (deleted user, revoked session) is
-    // caught here instead of silently passing a stale local session.
-    //
-    // The .catch() is load-bearing: this call fails on a flaky/offline network,
-    // and without it `checked` stayed false forever while the layout rendered
-    // nothing — a permanent blank screen on app launch.
+    // Fast path: `getSession()` reads the locally persisted session with no
+    // network round-trip, so a returning user reaches the app immediately
+    // instead of waiting on a full server round-trip before first paint —
+    // confirmed live as "the deck page ... is loading most of the time when
+    // u first open it" (Deck's own fetch can't start until this resolves).
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      setAuthed(!!data.session);
+      setChecked(true);
+    });
+
+    // `getUser()` still runs, just no longer blocking first paint — it
+    // round-trips to Supabase to catch a token whose underlying account no
+    // longer exists (deleted user, revoked session), which a purely local
+    // `getSession()` can't see. A failure here is best-effort only: it must
+    // NOT downgrade `authed` to false, or a flaky network would log out
+    // someone with a perfectly good locally cached session — the fast path
+    // above already stands as the answer in that case.
     supabase.auth
       .getUser()
       .then(({ data, error }) => {
         if (!mounted) return;
         setAuthed(!error && !!data.user);
+        setChecked(true);
       })
-      .catch(() => {
-        // Network failure — treat as unauthenticated so the user reaches the
-        // login screen and can retry, rather than being stuck on a blank view.
-        if (mounted) setAuthed(false);
-      })
-      .finally(() => {
-        if (mounted) setChecked(true);
-      });
+      .catch(() => {});
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return;
