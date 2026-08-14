@@ -41,7 +41,9 @@ tags:
 - setAirplaneMode: disabled
 
 # --- Part 2: review modal keyboard handling ---
-# Queue the current card for review, then open it from the Review Later tab.
+# Queue the current card for review, then open it from Review Later —
+# moved out of the bottom tab bar into the hamburger drawer (2026-08-14),
+# so it's reached via the menu now, not a direct tab tap.
 - extractTextWithAI:
     query: "The media title shown on the deck card, exactly as written"
     outputVariable: reviewTitle
@@ -53,6 +55,7 @@ tags:
     visible: "Undo"
     timeout: 10000
 
+- tapOn: "Open menu"
 - tapOn: "Review Later"
 - extendedWaitUntil:
     visible: "${reviewTitle}"

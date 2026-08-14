@@ -5,9 +5,12 @@
 # and tapping it undid the wrong title while rewinding to a different one.
 #
 # Updated for plan item 3.6 (2026-08-13): gesture map is now unified with web
-# (↑ = Watch Later, ↓ = Review Later). Card B below swipes DOWN. This edit is
-# itself untested — no Android device was connected when 3.6 shipped — so
-# treat a failure here as "maybe the flow, maybe the app" until it's run once.
+# (↑ = Watch Later, ↓ = Review Later). Card B below swipes DOWN.
+#
+# Updated 2026-08-14: the Undo chip's visible text used to be
+# `Undo "${title}"`; it's now just "Undo" (a small corner chip on the
+# poster, see deck.tsx) with the title only in its accessibilityLabel
+# (`Undo marking ${title}`) — assertions below match that instead.
 
 appId: host.exp.exponent
 name: Undo names the correct title after review-later
@@ -33,7 +36,7 @@ tags:
 - extendedWaitUntil:
     visible: "Undo"
     timeout: 10000
-- assertVisible: 'Undo "${titleA}"'
+- assertVisible: "Undo marking ${titleA}"
 
 # Card B — send it to Review Later with a swipe down.
 - extractTextWithAI:
@@ -44,12 +47,13 @@ tags:
     end: "50%, 70%"
     duration: 300
 
-# The regression: this showed 'Undo "${titleA}"' because card B was never
-# recorded, even though the deck had already advanced past it.
+# The regression: this showed the wrong accessibilityLabel (still naming
+# titleA) because card B was never recorded, even though the deck had
+# already advanced past it.
 - extendedWaitUntil:
     visible: "Undo"
     timeout: 10000
-- assertVisible: 'Undo "${titleB}"'
+- assertVisible: "Undo marking ${titleB}"
 - takeScreenshot: undo-names-review-later-title
 
 # And undoing must restore that same title, not the earlier one.

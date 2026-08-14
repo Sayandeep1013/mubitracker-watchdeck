@@ -28,6 +28,9 @@ tags:
     visible: "Deck"
     timeout: 45000
 
+# Friends moved out of the bottom tab bar into the hamburger drawer
+# (2026-08-14) — reached via the menu now, not a direct tab tap.
+- tapOn: "Open menu"
 - tapOn: "Friends"
 - extendedWaitUntil:
     visible: "Friends"

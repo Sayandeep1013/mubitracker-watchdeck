@@ -1,22 +1,26 @@
-# Plan items 3.2/3.5/3.6 — deck gesture map unified with web, plus the
-# fallback button row so no action is gesture-only.
+# Plan items 3.2/3.5/3.6 — deck gesture map unified with web.
 #
-# Updated 2026-08-14: the button row no longer has a separate Confirm step
-# (user ask — buttons now commit immediately on tap, same as a swipe) and
-# the deck screen now has a hamburger menu instead of some bottom tabs —
-# both changed the accessibilityLabel strings this flow selects by. The
-# "Select X" / "Confirm X" two-step is gone; there's just one tap per
-# action now: `${meta.label} — ${title}` (see ActionButton in deck.tsx).
+# Updated 2026-08-14, twice:
+# 1. Buttons stopped needing a separate Confirm step (commit on tap).
+# 2. Buttons were then removed ENTIRELY — deck is solely gesture-driven
+#    now, by explicit direction. This deliberately drops spec 31 §2's
+#    "no action may be gesture-only" guarantee on mobile; that's this
+#    session's product decision, not an oversight. The old "fallback
+#    buttons only, no swipe at all" section (spec 31 §2) is gone —
+#    there is no fallback to test anymore.
+#
+# Also: the Undo pill's visible text used to be `Undo "${title}"`; it's
+# now just "Undo" (a small corner chip on the poster, see deck.tsx) with
+# the title only in its accessibilityLabel (`Undo marking ${title}`).
+# Assertions below match that label instead of screen text.
 #
 # Verifies, in order: swipe left = Haven't, swipe right = Watched,
-# swipe up = Watch Later, swipe down = Review Later, and finally that the
-# same "Haven't" outcome is reachable with zero gestures via a single
-# button tap (spec 31 §2's "no action may be gesture-only" rule). Each
-# step checks the Undo pill names the card that was just acted on, which
-# only happens if performAction actually ran.
+# swipe up = Watch Later, swipe down = Review Later. Each step checks the
+# Undo chip names the card that was just acted on, which only happens if
+# performAction actually ran.
 
 appId: host.exp.exponent
-name: Deck gesture map matches web; fallback buttons work
+name: Deck gesture map matches web
 tags:
   - regression
   - deck
@@ -39,7 +43,7 @@ tags:
 - extendedWaitUntil:
     visible: "Undo"
     timeout: 10000
-- assertVisible: 'Undo "${titleLeft}"'
+- assertVisible: "Undo marking ${titleLeft}"
 
 # → Watched
 - extractTextWithAI:
@@ -52,7 +56,7 @@ tags:
 - extendedWaitUntil:
     visible: "Undo"
     timeout: 10000
-- assertVisible: 'Undo "${titleRight}"'
+- assertVisible: "Undo marking ${titleRight}"
 
 # ↑ Watch Later
 - extractTextWithAI:
@@ -65,7 +69,7 @@ tags:
 - extendedWaitUntil:
     visible: "Undo"
     timeout: 10000
-- assertVisible: 'Undo "${titleUp}"'
+- assertVisible: "Undo marking ${titleUp}"
 
 # ↓ Review Later
 - extractTextWithAI:
@@ -78,19 +82,5 @@ tags:
 - extendedWaitUntil:
     visible: "Undo"
     timeout: 10000
-- assertVisible: 'Undo "${titleDown}"'
+- assertVisible: "Undo marking ${titleDown}"
 - takeScreenshot: deck-gesture-map-all-four-directions
-
-# Fallback buttons only — no swipe at all. One tap on "Haven't" commits
-# immediately (no separate Confirm step), matching deck.tsx's ActionButton
-# accessibilityLabel: `${meta.label} — ${title}`.
-- extractTextWithAI:
-    query: "The media title shown on the deck card, exactly as written"
-    outputVariable: titleButtons
-- tapOn:
-    text: "Haven't — ${titleButtons}"
-- extendedWaitUntil:
-    visible: "Undo"
-    timeout: 10000
-- assertVisible: 'Undo "${titleButtons}"'
-- takeScreenshot: deck-fallback-buttons-no-gesture

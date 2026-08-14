@@ -34,9 +34,9 @@ Independent, small, immediately felt. No prerequisites. **Do these first.**
 > mobile items are code-complete but need the Android device to confirm.
 > Maestro flows are already written for them in `mobile-qa/flows/`.
 
-- [~] **0.1 Auth-guard blank screen (P0)** — `apps/mobile/app/_layout.tsx:19`
+- [x] **0.1 Auth-guard blank screen (P0)** — `apps/mobile/app/_layout.tsx:19`
   `supabase.auth.getUser().then()` has no `.catch()`. On network rejection `setChecked(true)` never runs and `{checked && <Stack>}` renders nothing → **permanent blank screen**. Add `.catch()`, plus a loading indicator during the round-trip.
-  *Verify:* airplane-mode launch reaches the login screen, never a blank one.
+  *Verify:* airplane-mode launch reaches the login screen, never a blank one. **Verified `2026-08-14`** — `mobile-qa/flows/auth-guard-offline.yaml` passed clean on a real connected device.
 
 - [~] **0.2 Mobile screens never refresh (P0)** — `apps/mobile/app/(tabs)/collection.tsx:9`, `review-later.tsx:10`, `profile.tsx:11`
   `useEffect(…, [])` with no `useFocusEffect`; tabs stay mounted so data is stale all session. Swipe a title watched → Collection still shows "Unwatched".
@@ -112,9 +112,10 @@ Spec [`20`](spec/20-deck-engine-v2.md). Requires Stage 1.
 
 - [x] **2.7 Wire both clients to buckets** — replace cursor with `bucketId` in `DeckView.tsx` and `apps/mobile/app/(tabs)/deck.tsx`; honour `partial`/`reason`.
   *Verify:* filtered deck <800ms; no null-cursor dead end reachable.
-  > Both clients now detect the response shape (`bucketId` present ⇒ v2) and branch accordingly — no separate code path needed per engine, so this is safe to ship even while `DECK_ENGINE` stays unset in prod. Verified end-to-end in a real headless browser (web) against `DECK_ENGINE=v2` locally; mobile got the identical logic but is typecheck-only (no device connected this session — see HANDOFF).
+  > Both clients now detect the response shape (`bucketId` present ⇒ v2) and branch accordingly — no separate code path needed per engine, so this is safe to ship even while `DECK_ENGINE` stays unset in prod. Verified end-to-end in a real headless browser (web) against `DECK_ENGINE=v2` locally. **Mobile verified live on-device `2026-08-14`** — swiped through several cards against production with `DECK_ENGINE=v2` set, undo/exit animations/analytics all worked correctly.
 
-- [ ] **2.8 Retire v1** behind `DECK_ENGINE=v2` after a clean week.
+- [~] **2.8 Retire v1** behind `DECK_ENGINE=v2` after a clean week.
+  **The flag flip is done** — `DECK_ENGINE=v2` set in Vercel Production `2026-08-14` with the user's go-ahead, verified live (`bucketId` present in a real `/api/v1/deck` response). Still open: the actual "retire" part — delete `generate.ts`/v1 after a clean week with no `deck_empty` spike (spec 20's rollback plan). Not urgent; just don't mark this `[x]` until v1 is actually gone.
 
 ---
 

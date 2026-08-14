@@ -9,19 +9,49 @@ Read after [`CONTEXT.md`](CONTEXT.md). Then work [`IMPLEMENTATION-PLAN.md`](IMPL
 
 ```
 Read docs/CONTEXT.md, docs/HANDOFF.md, and docs/IMPLEMENTATION-PLAN.md.
+Read the "Post-Stage-5 session — 2026-08-14" entry in HANDOFF.md's
+Session Log in full before touching anything — it has the detail behind
+every item below and several "verify this before trusting it" flags.
 
-Stages 0-1, all of Stage 2 (2.1-2.7), all of Stage 3, all of Stage 4,
-and all of Stage 5 (5.1-5.9, one dated waiver) are done. IMPLEMENTATION-
-PLAN.md's explicit backlog is now exhausted — there is no Stage 6.
-What's left is entirely verification debt and two things waiting on the
-user (below), not new feature work. Don't invent a new stage; if you
-finish everything below, say so and ask what's next rather than picking
-your own direction.
+Stages 0-1, all of Stage 2 (2.1-2.8 — 2.8's flag flip is done, only the
+"delete v1 after a clean week" half remains), all of Stage 3, all of
+Stage 4, and all of Stage 5 (5.1-5.9, one dated waiver) are done.
+IMPLEMENTATION-PLAN.md's explicit backlog is exhausted — there is no
+Stage 6. On top of that, a same-day follow-up session shipped a mobile
+deck-screen redesign and two real cross-cutting bugs (see below) that
+aren't tracked as plan items at all, since they were direct user
+requests, not backlog work. Don't invent a new stage; if you finish
+everything below, say so and ask what's next rather than picking your
+own direction.
 
-**Three things explicitly waiting on the user, not on you:**
-1. **Stage 2.8** (flip `DECK_ENGINE=v2` in Vercel) — user-visible
-   production change, needs a direct go-ahead first.
-2. **Stage 5.5** (staging Supabase) — dated waiver recorded 2026-08-14
+**First, before anything else — things that were left unverified when
+this handoff was written, because the connected Android device dropped
+its ADB connection mid-session and hadn't reconnected yet:**
+1. **The mobile deck screen's final state needs a fresh look.** The
+   bottom title/meta/IMDb overlay had its translucent background panel
+   removed in the very last edit of the session (replaced with a plain
+   text-shadow, no box) — this was NOT re-verified on a real screen
+   before the session ended. Screenshot it and check the title reads
+   cleanly against both a dark AND a light/white-dominant poster (no
+   background box means legibility depends entirely on the shadow now).
+2. **Four mobile-qa flow files were hand-edited to match the deck
+   redesign but never executed as files this session** —
+   `deck-gesture-map-and-buttons.yaml`, `undo-after-review-later.yaml`,
+   `toast-and-keyboard.yaml`, `friends-ui.yaml`. The underlying
+   mechanics (swipe classify, Undo chip, drawer nav) were checked via ad
+   hoc Maestro commands, which is not the same as the flow file itself
+   being syntactically correct end to end. Run
+   `maestro test mobile-qa/flows/<file>.yaml` on each before trusting
+   them, same "first run validates the flow as much as the app" caveat
+   that applied to every flow the first time it ran this session.
+3. If `git status` shows uncommitted changes when you start, that's
+   this — commit them (with on-device verification first) before doing
+   anything else.
+
+**What's left is entirely verification debt, one thing waiting on the
+user, and the two items above — not new feature work.**
+
+1. **Stage 5.5** (staging Supabase) — dated waiver recorded 2026-08-14
    (spec 50 §1). Needs the account owner's Supabase dashboard access to
    provision `mubitracker-staging`; not delegable to a project-scoped API
    token. If the user wants to proceed: they create the project, hand you
@@ -29,39 +59,38 @@ your own direction.
    `STAGING_URL` (GitHub Variable) and `E2E_SUPABASE_URL`/
    `E2E_SUPABASE_ANON_KEY` (GitHub Secrets) at it — nothing else needs to
    change, CI/nightly already target `vars.STAGING_URL` generically.
-3. **Device verification for everything mobile** — if an Android device
+2. **Device verification for everything mobile** — if an Android device
    is connected (check: `adb devices`), run through `mobile-qa/flows/`
    and do a manual pass over anything without a dedicated flow. Promote
    `[~]` to `[x]` only for what you actually ran, one item at a time.
+   Item 0.1 (auth-guard) is already promoted; the rest in the table below
+   are still carryover.
 
 **What genuinely needs picking up, in priority order:**
 
 1. **`mobile-e2e` nightly job hangs — root cause still unknown** (spec 50
    §3, `.github/workflows/nightly.yml`). Three real dispatch-and-fix
-   rounds this session got the job through emulator boot + KVM + Maestro
-   install every time (real, load-bearing infrastructure, not a guess —
-   see Session Log for the exact bugs found and fixed in rounds 1-2).
-   **Round 3 then hung completely silently for 45+ minutes** — zero log
-   output between "emulator booted" and the point it was manually
-   cancelled via the Actions API. No step had a timeout, so there's no
-   log evidence of which step (APK `curl`, `adb install`, Metro startup)
-   actually stalled. Added timeouts to every step + a job-level
+   rounds got the job through emulator boot + KVM + Maestro install every
+   time (real, load-bearing infrastructure, not a guess — see Session Log
+   for the exact bugs found and fixed in rounds 1-2). **Round 3 then hung
+   completely silently for 45+ minutes** — zero log output between
+   "emulator booted" and the point it was manually cancelled via the
+   Actions API. No step had a timeout, so there's no log evidence of
+   which step (APK `curl`, `adb install`, Metro startup) actually
+   stalled. Added timeouts to every step + a job-level
    `timeout-minutes: 20` backstop (`7590018`) so the *next* dispatch
    fails fast with a diagnosable log instead of hanging again — this is
    a safety net, not a fix; the underlying cause is still open. Dispatch
    `nightly.yml` (GitHub PAT with `repo`+`workflow` scope needed — see §7
    fallback tooling notes in CONTEXT.md for how to set one up as repo
-   Secrets/Variables) and read exactly which new timeout fires. Once
-   that's fixed, there's a *second*, separate, still-unverified risk:
-   `mobile-qa/subflows/open-project.yaml` taps a "Recently opened →
-   Mubitracker" row in Expo Go, which only exists after a prior
-   connection — a freshly-sideloaded CI emulator has zero history, so
-   this may have nothing to tap. If it hits that, the fix is a first-run
-   fallback to Expo Go's manual "Enter URL manually" field (exact UI text
-   unverified — read it off a real screenshot first, don't guess).
+   Secrets/Variables) and read exactly which new timeout fires. The
+   `open-project.yaml` "Recently opened" risk this note used to flag is
+   now moot — that subflow was rewritten this session to always enter the
+   dev server URL manually instead (see the Post-Stage-5 Session Log
+   entry), which also fixes it for a fresh CI emulator with zero history.
 2. Everything in the "Pending verification" table below — unchanged
    carryover from Stage 0/3/4, still needs the Android device.
-3. Optional cleanup, not blocking: `pnpm test:e2e`'s 6 specs and
+3. Optional cleanup, not blocking: `pnpm test:e2e`'s specs and
    `scripts/validate-deck-loop.mjs`/`cleanup-test-accounts.mjs` all
    create real `wqa*` accounts against production. The nightly job's
    `cleanup-test-accounts.mjs --older-than 24h` step handles steady-state
@@ -79,7 +108,7 @@ Stop and ask me only if an item needs a product decision that isn't
 already settled in docs/spec/. Otherwise keep going.
 ```
 
-**Current position: Stages 0-1, all of Stage 2 (2.1-2.7), all of Stage 3, all of Stage 4, and all of Stage 5 (5.1-5.9, `2026-08-14`, main at `7590018`) are done or explicitly accounted for. IMPLEMENTATION-PLAN.md's explicit backlog is exhausted — there is no Stage 6 yet. Deck v2 is behind `DECK_ENGINE=v2` (unset in prod); Stage 2.8 needs the user's go-ahead. Stage 5.5 (staging Supabase) is a dated waiver, not shipped — needs the user's Supabase dashboard access. Stage 5.3's `mobile-e2e` nightly job is real, working infrastructure through emulator boot/KVM/Maestro install (confirmed via three actual `workflow_dispatch` runs — not guessed) but round 3 hung silently for 45+ minutes with no diagnosable log; fail-fast timeouts were added as a safety net (`7590018`) but the hang's root cause is still open — see the Next-session block above for exactly what the next dispatch needs to reveal. Everything mobile-touching from Stages 0/3/4 remains `[~]`, unchanged carryover, still needs the Android device.**
+**Current position: Stages 0-1, all of Stage 2 (2.1-2.8), all of Stage 3, all of Stage 4, and all of Stage 5 (5.1-5.9, one dated waiver) are done or explicitly accounted for, main at `c77aab6` (2026-08-14, post-Stage-5 follow-up session). IMPLEMENTATION-PLAN.md's explicit backlog is exhausted — there is no Stage 6. Stage 2.8's flag flip is done and verified live (`DECK_ENGINE=v2` in Vercel Production, confirmed via a real API response); only "delete v1 after a clean week" remains, not urgent. Stage 5.5 (staging Supabase) is a dated waiver, not shipped — needs the user's Supabase dashboard access. Stage 5.3's `mobile-e2e` nightly job is real, working infrastructure through emulator boot/KVM/Maestro install (confirmed via three actual `workflow_dispatch` runs — not guessed) but round 3 hung silently for 45+ minutes with no diagnosable log; fail-fast timeouts were added as a safety net (`7590018`) but the hang's root cause is still open. On top of the stage plan, this same-day follow-up session did a 3-pass mobile deck-screen redesign (gesture-only, full-bleed poster, slide-out drawer menu) and fixed two real bugs found live (a raw-JSON API error message bug across 15 routes, and 3 broken Maestro test flows) — full detail in the Session Log entry below. Two things need verification before being trusted (device disconnected mid-session, see the numbered list above): the final title-overlay styling, and 4 hand-edited mobile-qa flow files that were never executed as files.**
 
 ### Pending verification
 
@@ -91,11 +120,11 @@ Code-complete but unverified — all need the Android device. Run `maestro test 
 | 0.2 tabs never refresh | `mobile-qa/flows/tab-refresh.yaml` — run and passing |
 | 0.5 undo desync after review-later | `mobile-qa/flows/undo-after-review-later.yaml` — run and passing pre-3.6; swipe direction updated for 3.6's gesture-map unification, **not re-run since** |
 | 0.7 mobile error handling | covered incidentally by the above; no dedicated flow yet |
-| 3.2/3.5/3.6 deck gesture map + fallback buttons | `mobile-qa/flows/deck-gesture-map-and-buttons.yaml` — **written, never run** |
-| 3.3/3.4 toast + review-modal keyboard handling | `mobile-qa/flows/toast-and-keyboard.yaml` — **written, never run** |
+| 3.2/3.5/3.6 deck gesture map | `mobile-qa/flows/deck-gesture-map-and-buttons.yaml` — rewritten `2026-08-14` (fallback-button section removed, deck is gesture-only now), **still never run as a file** |
+| 3.3/3.4 toast + review-modal keyboard handling | `mobile-qa/flows/toast-and-keyboard.yaml` — nav path fixed `2026-08-14` (Review Later is a drawer item now), **still never run as a file** |
 | 3.1 theme tokens, 3.7 per-screen states | no dedicated flow — mostly visual; do a manual pass and screenshot each of the 7 screens' loading/empty/error states, log results in the Session Log below |
 | 4.1 mobile privacy toggle + Copy handle | covered incidentally by `friends-ui.yaml`'s Copy handle assertion; no dedicated toggle check yet |
-| 4.2 mobile friends UI (tab, add modal, notifications) | `mobile-qa/flows/friends-ui.yaml` — **written, never run**, single-device scope only (no request/accept/block/unblock/Compare/Their Deck coverage — needs a second identity) |
+| 4.2 mobile friends UI (tab, add modal, notifications) | `mobile-qa/flows/friends-ui.yaml` — nav path fixed `2026-08-14` (Friends is a drawer item now), **still never run as a file**, single-device scope only (no request/accept/block/unblock/Compare/Their Deck coverage — needs a second identity) |
 | 4.3 mobile filters + presets | `mobile-qa/flows/filters-and-presets.yaml` — **written, never run** |
 | 4.4 mobile Watch Later screen | no dedicated flow — do a manual pass: swipe up on the deck, open Watch Later from Collection's header button, confirm the title lists and "Mark watched" works |
 | 4.5 mobile undo depth (1→20) | `undo-after-review-later.yaml` exercises a single undo; multi-level (2-3 undos in a row) has no dedicated check yet |
@@ -131,6 +160,117 @@ This is the mechanism that lets a session run without the user in the loop. Foll
 ## Session Log
 
 Newest first. One line per completed item; a block per stage.
+
+### Post-Stage-5 session — 2026-08-14 (Stage 2.8 shipped, mobile UI overhaul, real bugs found and fixed)
+
+Not a numbered stage — direct user requests picked up right after Stage 5 closed. `main` at
+`c77aab6` (device-verification commits still pending, see Next-session block above). Commits, in
+order: `55b581b` (3 Maestro flow bugs, first live-device run), `ef0a7b6` (web deck poster grow),
+`eafbc3d` (ZodError-message bug, 15 routes), `bcb6320`→`4cbfa4c`→`c77aab6` (mobile deck redesign, 3
+passes), plus an uncommitted-as-of-writing batch fixing the mobile-qa flows the deck redesign broke
+and the mobile-title-overlay change (see below — verify+commit before trusting `git log` fully
+matches this description).
+
+**Stage 2.8 shipped.** `DECK_ENGINE=v2` set in Vercel Production with the user's explicit go-ahead.
+Vercel MCP (now authenticated, after being stuck on OAuth for most of the previous session) has no
+env-var write tool in its surface — `list_projects`/`get_project`/`get_deployment`/logs/analytics,
+but nothing to create or edit an Environment Variable. Gave the user manual dashboard steps; they set
+it, this session verified the effect empirically (a real signed-in `GET /api/v1/deck` against
+production now returns `bucketId`, the v2-only field) rather than trusting the user's report alone.
+Test account used for the check was deleted afterward via the Auth Admin API.
+
+**First live device run of `mobile-qa/` this session** found and fixed 3 real bugs in the flows
+themselves (not the app): `open-project.yaml` relied on Expo Go's "Recently opened" list, which only
+exists after a prior successful connection — on a real run it instead tried to fetch a *published*
+update from stale cache and hit Expo Go's own error screen; switched to always entering the dev
+server URL manually. `hint:` is not a valid Maestro selector key ("Unknown Property: hint" aborts
+before any command runs) — was used across 4 flows, fixed to `text:`. `hideKeyboard` isn't always
+dismissable on this device's Gboard config — made `optional: true`. `auth-guard-offline.yaml`
+re-verified passing after the fixes; IMPLEMENTATION-PLAN.md's item 0.1 promoted `[~]`→`[x]`.
+
+**Web: poster grow, take two.** The very first fix (prior session, `84d255b`) stopped the deck page
+from overflowing vertically but capped the poster at a flat `32dvh` regardless of how much space was
+actually free — confirmed via measurement that on a typical viewport ~300-400px sat unused while the
+poster stayed the smallest thing on screen. Raised to `clamp(220px,54dvh,560px)` and compacted the
+action buttons into a small toolbar (was two rows + a separate Confirm bar) so they don't compete
+with the poster for attention. Verified via real Playwright screenshots across 4 viewport sizes
+(375×667 through 1440×900), not just computed values.
+
+**Real bug found and fixed in 15 API routes**: a Zod `ValidationError`'s own `.message` getter IS
+`JSON.stringify(issues, null, 2)` — every route's generic `catch (e) { ... e instanceof Error ?
+e.message : fallback }` pattern (Error is ZodError's parent class) forwarded that raw JSON straight
+into the API response. Confirmed live, not guessed: mobile signup's "password too short" error
+rendered as literal JSON on screen — the exact "coding way" bug report the user filed. Centralized
+the fix as `errorMessage(e, fallback)` in `lib/api/helpers.ts` rather than patching 15 fallback
+strings individually. **First attempt used `e instanceof ZodError` and silently didn't work** —
+confirmed via curl against a fresh dev server restart, still got raw JSON. Root cause: Turbopack
+compiles each API route as its own module graph, so `@mubitracker/shared`'s compiled schemas and this
+file's own `import { ZodError } from 'zod'` ended up as two distinct constructor references for the
+same logical class (one zod install in the pnpm store, but bundler-level module isolation, not an
+actual duplicate dependency). Fixed by duck-typing on `issues` (zod's own public error shape,
+constructor-identity-independent) instead of `instanceof`.
+
+**Mobile deck screen redesign — three passes**, each driven by direct live feedback after seeing the
+previous one:
+1. Removed the select-then-Confirm two-step; the 4 action buttons commit immediately on tap, matching
+   how swipes already worked.
+2. Added a hamburger menu. **First attempt was wrong** — a full modal *page* (`app/menu.tsx`,
+   `presentation:'modal'`), which the user correctly called out as not what "hamburger menu" means;
+   also moved all 4 non-Deck/Search tabs out when only 2-3 should've moved. Reworked into a real
+   slide-out drawer: `lib/menu.tsx` (`MenuProvider`/`useMenu()`) + `components/MenuDrawer.tsx`
+   (reanimated `translateX` + dimmed tappable backdrop), mounted once at the root as a sibling of the
+   `<Stack>` so it overlays the tab bar too — the screen behind it stays mounted and visible. Dock
+   settled at 4 tabs (Deck/Search/Collection/Profile, `href:null` on the other two's `Tabs.Screen`
+   keeps them real routes without a bar button); Review Later + Friends moved into the drawer, joined
+   by Watch Later/About (never tabs to begin with). Drawer rows got a distinct color accent per item
+   (icon badge background + left border) on a later ask.
+3. Poster made bigger — twice. First pass used a flat `POSTER_WIDTH * 1.72` ratio; **confirmed
+   broken live via screenshot** (title/meta text rendering on top of the button row — not enough
+   height was actually free for a poster that tall). Fixed with `flex:1` + `maxHeight` on the poster
+   wrapper instead of a fixed ratio, same "fill what's actually left" principle as the web fix above,
+   plus moving the Undo pill from a full-width banner above the poster into a small corner chip on it
+   (freed a whole row). Then, per explicit direction ("solely gestures... poster takes the whole
+   page"): **removed the 4 action buttons entirely** — deck is now gesture-only, which deliberately
+   drops spec 31 §2's "no action may be gesture-only" guarantee on mobile (a product decision this
+   session, not an oversight; the corresponding Maestro fallback-button check no longer exists).
+   Made the poster genuinely full-bleed (Deck tab's header is now `headerTransparent` — content isn't
+   pushed down to make room for a header bar anymore, so hamburger/Filters float directly on the
+   poster at their same spot; gave header buttons a translucent circular background to stay legible
+   over arbitrary art). Added Tinder-style rotated corner stamps (green "WATCHED"/red "HAVEN'T"
+   fading in with drag distance) replacing the old full-poster color-wash cues. Made the gesture hint
+   text bold/shadowed since it's now the only on-screen instruction for an entirely gesture-driven
+   screen. **Then**, per a follow-up ask to remove the translucent bottom bar the title/meta/IMDb sat
+   on (it read as bolted-on UI chrome, and its top edge cut the poster with a hard line): removed that
+   background entirely — title/meta/IMDb now sit directly on the poster with a text shadow, no
+   background box, closer to a Stremio/Letterboxd-style key-art title treatment.
+   Everything through step 3's Tinder stamps was verified live via Maestro screenshots (full-bleed
+   poster with floating header icons, a completed swipe, the drawer's colorful rows, backdrop-tap
+   dismissal, nav-to-Friends). **The final "remove the bottom bar" edit was NOT re-verified on-device
+   before this doc was written** — the connected device dropped its ADB connection mid-session
+   (unrelated real incoming phone call interfered, then USB/adb didn't reconnect for several minutes)
+   and hadn't come back by the time this handoff was written. **Verify this specific change first** if
+   picking this up — screenshot the deck screen and confirm the title reads cleanly against light AND
+   dark poster art (no background box means legibility now depends entirely on the text shadow, which
+   hasn't been checked against a bright/white-dominant poster).
+   Follow-on: `mobile-qa/flows/deck-gesture-map-and-buttons.yaml`'s button-fallback section was
+   removed (nothing left to test) and its Undo-chip assertions fixed to match the corner chip's new
+   shorter visible text; `undo-after-review-later.yaml` got the same Undo-text fix;
+   `toast-and-keyboard.yaml` and `friends-ui.yaml` both had a `tapOn: "Open menu"` inserted before
+   their first tap on "Review Later"/"Friends" respectively, since those are drawer items now, not
+   bottom-tab buttons. **None of these 4 edited flow files have been run as files this session** —
+   the underlying mechanics were checked via ad hoc Maestro commands, not by executing
+   `maestro test mobile-qa/flows/<file>.yaml` itself. Do that first before trusting them.
+
+**`rein` test account deleted completely** (auth.users + profiles, confirmed gone via direct SQL
+after) at the user's request. Investigated first rather than just complying blind: a direct Supabase
+token request AND a real Playwright run against the live production login page both succeeded with
+the account's existing credentials — the user's repeated login failures were not caused by a broken
+account, a wrong password, or a code bug. Most likely explanation relayed to the user: a typo in the
+generated password (mixed case + hyphen + exclamation mark) or browser autofill overwriting it with
+an old saved one. Also discovered along the way: Supabase Admin API's `GET /admin/users?email=X`
+does **not** actually filter by email in this project's GoTrue version — it silently ignores the
+query param and returns page 1 of all users. Don't rely on that filter for account lookups; query the
+`profiles` table by username via SQL first to get the real user id, then use `/admin/users/{id}`.
 
 ### Stage 5 complete — 2026-08-14
 

@@ -552,12 +552,17 @@ export default function DeckScreen() {
             </Pressable>
           )}
 
-          {/* Title/meta/IMDb overlay the bottom of the poster on a
-              translucent panel instead of living in blank space below it —
-              the poster fills the whole screen, so this IS the bottom of
-              the page. */}
-          <View style={[styles.bottomPanel, { paddingBottom: insets.bottom + space.lg }]}>
-            <Text style={styles.title}>{current.title}</Text>
+          {/* Title/meta/IMDb sit directly on the poster — no background bar.
+              A solid/translucent panel behind them read as a separate UI
+              chrome element bolted onto the art (and its top edge cut the
+              poster with a hard line); a drop shadow on the text itself
+              keeps it legible over any poster without boxing it in, same
+              treatment as the gesture hint above and closer to how
+              Stremio/Letterboxd-style apps present a title over key art. */}
+          <View style={[styles.bottomInfo, { paddingBottom: insets.bottom + space.lg }]} pointerEvents="box-none">
+            <Text style={styles.title} numberOfLines={2}>
+              {current.title}
+            </Text>
             <Text style={styles.meta}>
               {current.year ?? '—'} · {current.displayType}
             </Text>
@@ -641,18 +646,43 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(9,9,11,0.45)',
   },
   stampText: { fontSize: type.label.fontSize, fontWeight: '800', letterSpacing: 0.5 },
-  bottomPanel: {
+  // No background box — a drop shadow on the text itself is the only thing
+  // keeping it legible over the poster, same treatment as the gesture hint.
+  bottomInfo: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: space.lg,
-    paddingTop: space.xxl,
-    backgroundColor: 'rgba(9,9,11,0.6)',
+    paddingHorizontal: space.xl,
   },
-  title: { color: color.text, ...type.title, textAlign: 'center' },
-  meta: { color: color.textMuted, fontSize: type.body.fontSize, marginTop: space.xs, textAlign: 'center' },
+  title: {
+    color: '#fff',
+    fontSize: 30,
+    lineHeight: 36,
+    fontWeight: '800',
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.9)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 10,
+  },
+  meta: {
+    color: '#e4e4e7',
+    fontSize: type.body.fontSize,
+    fontWeight: '600',
+    marginTop: space.xs,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.9)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
+  },
   imdbHit: { minHeight: 32, alignItems: 'center', justifyContent: 'center', marginTop: space.xs },
-  imdbLink: { color: color.textMuted, fontSize: type.caption.fontSize, fontWeight: '600' },
+  imdbLink: {
+    color: '#e4e4e7',
+    fontSize: type.caption.fontSize,
+    fontWeight: '700',
+    textShadowColor: 'rgba(0,0,0,0.9)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 6,
+  },
   muted: { color: color.textMuted },
 });
