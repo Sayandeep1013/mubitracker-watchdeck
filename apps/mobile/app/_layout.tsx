@@ -116,7 +116,17 @@ export default function RootLayout() {
                           modal sliding up rather than a same-direction full page
                           push, which is otherwise indistinguishable on Android. */}
                       <Stack
-                        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg } }}
+                        screenOptions={{
+                          headerShown: false,
+                          contentStyle: { backgroundColor: color.bg },
+                          // Android's native-stack default (~300ms) read as
+                          // "too quick and snappy, abrupt" on both open AND
+                          // close — confirmed live. Applied once here so
+                          // every push/modal (including the ones below that
+                          // only override `animation`) shares the same
+                          // slower, more deliberate feel both directions.
+                          animationDuration: 420,
+                        }}
                       >
                         <Stack.Screen name="(tabs)" />
                         <Stack.Screen name="login" />

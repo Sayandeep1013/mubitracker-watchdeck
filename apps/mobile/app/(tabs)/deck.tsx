@@ -188,6 +188,13 @@ export default function DeckScreen() {
 
   const fetching = useRef(false);
   const busy = useRef(false);
+  // A filter change swaps the deck's contents in place rather than emptying
+  // it first — see the `[filters]` effect and `setQueue` below.
+  const pendingReplace = useRef(false);
+  const queuedReload = useRef(false);
+  const loadDeckRef = useRef<
+    (o?: { cursor: string | null; sessionId: string | null }, r?: 'initial' | 'filter_change') => void
+  >(() => {});
   // Analytics (spec 50 §6) — mirrors web DeckView.tsx's refs.
   const filtersApplied = useRef(false);
   const batchesServedThisSession = useRef(0);
@@ -203,7 +210,14 @@ export default function DeckScreen() {
     overrides?: { cursor: string | null; sessionId: string | null },
     reason?: 'initial' | 'filter_change',
   ) => {
-    if (fetching.current) return;
+    if (fetching.current) {
+      // A filter change landing mid-prefetch must not be dropped. Now that
+      // the queue stays populated across a filter change, nothing else would
+      // retrigger the load, and the deck would keep serving the previous
+      // filter set's cards indefinitely.
+      if (overrides) queuedReload.current = true;
+      return;
+    }
     fetching.current = true;
     // On a filter change the caller passes explicit nulls — cursor/sessionId
     // state resets haven't committed yet, so reading the closure's `cursor`/
@@ -226,10 +240,22 @@ export default function DeckScreen() {
       const latencyMs = Date.now() - fetchStart;
       if (engineMode.current === null) engineMode.current = data.bucketId ? 'v2' : 'v1';
 
+      // A filter change replaces the deck outright; every other load appends.
+      // Deliberately NOT done by clearing the queue up front: that left
+      // `current` undefined for the whole round-trip, and since
+      // `initialLoadDone` is already true by then, the Deck rendered its
+      // "No titles match — try again later" empty state for a few hundred ms
+      // on every Apply — confirmed live as the flicker closing Filters.
+      const replacing = pendingReplace.current;
       setQueue((q) => {
+        if (replacing) return data.items;
         const seen = new Set(q.map((item) => item.id));
         return [...q, ...data.items.filter((item) => !seen.has(item.id))];
       });
+      if (replacing) {
+        setIndex(0);
+        pendingReplace.current = false;
+      }
       if (engineMode.current === 'v2') {
         setDeckExhausted(data.items.length === 0 && Boolean(data.reason));
       } else {
@@ -276,12 +302,20 @@ export default function DeckScreen() {
     } finally {
       fetching.current = false;
       setInitialLoadDone(true);
+      if (queuedReload.current) {
+        queuedReload.current = false;
+        loadDeckRef.current({ cursor: null, sessionId: null }, 'filter_change');
+      }
     }
   }, [cursor, sessionId, friendId, friendMode, filters]);
 
+  loadDeckRef.current = loadDeck;
+
   useEffect(() => {
-    setQueue([]);
-    setIndex(0);
+    // The queue is intentionally left alone here — emptying it is what made
+    // the Deck flash its empty state while the new filter set loaded. It gets
+    // replaced atomically in `loadDeck` once the replacement data lands.
+    pendingReplace.current = true;
     setCursor(null);
     setSessionId(null);
     setDeckExhausted(false);

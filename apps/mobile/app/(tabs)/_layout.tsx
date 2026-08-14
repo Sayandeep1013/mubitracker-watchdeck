@@ -156,8 +156,13 @@ export default function TabLayout() {
           // which animate natively in both directions. 'fade' is the only
           // option that reads as smooth regardless of which two tabs are
           // involved — 'shift' assumes adjacent, visually related screens,
-          // which doesn't hold for e.g. Deck <-> About.
+          // which doesn't hold for e.g. Deck <-> About. bottom-tabs' own
+          // default fade duration (~150ms) still read as abrupt. 300ms, not
+          // the Stack's 420ms: a cross-fade has no movement to carry a long
+          // duration, so past ~300ms it stops reading as "smooth" and starts
+          // reading as lag — slides can afford the longer curve, fades can't.
           animation: 'fade',
+          transitionSpec: { animation: 'timing', config: { duration: 300 } },
         };
       }}
     >
