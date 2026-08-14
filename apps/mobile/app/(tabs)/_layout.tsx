@@ -1,5 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { Tabs, useRouter } from 'expo-router';
+import { BlurView } from 'expo-blur';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNotifications } from '@/lib/notifications';
 import { useFilters } from '@/lib/filters';
@@ -104,13 +105,29 @@ function FriendsHeaderRight() {
 export default function TabLayout() {
   return (
     <Tabs
-      screenOptions={{
-        headerStyle: { backgroundColor: themeColor.bg },
-        headerTintColor: themeColor.text,
-        headerLeft: HamburgerHeaderLeft,
-        tabBarStyle: { backgroundColor: themeColor.bg, borderTopColor: themeColor.border },
-        tabBarActiveTintColor: themeColor.text,
-        tabBarInactiveTintColor: themeColor.textMuted,
+      screenOptions={({ route }) => {
+        // Deck has its own blurred, poster-tinted background (see
+        // deck.tsx) that's meant to read as one continuous surface —
+        // a solid header bar and solid tab bar on top of it were two
+        // abrupt black bands cutting across it. Scoped to Deck only
+        // (via `route.name`) so every other screen's plain dark
+        // background keeps its normal solid chrome — those don't have
+        // a gradient for a hard edge to interrupt.
+        const isDeck = route.name === 'deck';
+        return {
+          headerStyle: { backgroundColor: themeColor.bg },
+          headerTintColor: themeColor.text,
+          headerLeft: HamburgerHeaderLeft,
+          headerTransparent: isDeck,
+          tabBarStyle: isDeck
+            ? { position: 'absolute', backgroundColor: 'transparent', borderTopColor: 'transparent', elevation: 0 }
+            : { backgroundColor: themeColor.bg, borderTopColor: themeColor.border },
+          tabBarBackground: isDeck
+            ? () => <BlurView intensity={45} tint="dark" style={StyleSheet.absoluteFill} />
+            : undefined,
+          tabBarActiveTintColor: themeColor.text,
+          tabBarInactiveTintColor: themeColor.textMuted,
+        };
       }}
     >
       <Tabs.Screen

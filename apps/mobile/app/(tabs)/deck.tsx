@@ -1,7 +1,8 @@
 import { Feather } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { BlurView } from 'expo-blur';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Dimensions, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -60,22 +61,32 @@ function filterKeys(filters: ReturnType<typeof useFilters>['filters']): string[]
 // double border (an outer frame with a gap, then the poster's own border)
 // instead of the poster running edge to edge.
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const POSTER_WIDTH = Math.min(SCREEN_WIDTH * 0.62, 250);
+const POSTER_WIDTH = Math.min(SCREEN_WIDTH * 0.68, 270);
 const POSTER_MAX_HEIGHT = Math.round(POSTER_WIDTH * 1.5);
 const FRAME_GAP = 5;
 const FRAME_BORDER = 1.5;
+// Header and tab bar are both transparent/floating on this screen now (see
+// (tabs)/_layout.tsx) so the blurred backdrop shows through behind them
+// instead of being cut off by solid chrome — which means this screen's own
+// content has to reserve that space manually instead of getting it for
+// free. Approximate standard Material heights; not pixel-exact, but close
+// enough that nothing sits under the header/tab bar.
+const HEADER_HEIGHT = 56;
+const TAB_BAR_HEIGHT = 56;
 const POSTER_BORDER = 2;
 
 export default function DeckScreen() {
   const insets = useSafeAreaInsets();
   const showToast = useToast();
+  const navigation = useNavigation();
+  const router = useRouter();
   // Friends → Their Deck (spec 40 §3) navigates here with these params —
   // matches web's `?friend_id=&friend_mode=` handling in DeckView.tsx.
   const { friend_id: friendId, friend_mode: friendMode } = useLocalSearchParams<{
     friend_id?: string;
     friend_mode?: string;
   }>();
-  const { filters } = useFilters();
+  const { filters, activeCount } = useFilters();
   const [queue, setQueue] = useState<DeckItem[]>([]);
   const [index, setIndex] = useState(0);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -377,6 +388,49 @@ export default function DeckScreen() {
     }
   };
 
+  // Undo used to be a chip sitting on top of the poster — moved into the
+  // header next to Filters instead, per explicit ask, so it's not on the
+  // artwork itself. Overrides the Tabs.Screen's static headerRight
+  // (defined in (tabs)/_layout.tsx) with one that also knows about this
+  // screen's own undoStack; re-runs whenever the things it renders change.
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={styles.headerRightRow}>
+          {undoStack.length > 0 && (
+            <Pressable
+              onPress={handleUndo}
+              disabled={undoing}
+              hitSlop={hitSlopFor(28)}
+              style={({ pressed }) => [styles.headerUndoBtn, pressed && styles.pressed]}
+              accessibilityRole="button"
+              accessibilityLabel={`Undo marking ${undoStack[0].title}`}
+              accessibilityState={{ disabled: undoing }}
+            >
+              <Feather name="rotate-ccw" size={15} color={color.text} />
+              <Text style={styles.headerUndoText}>{undoing ? 'Undoing…' : 'Undo'}</Text>
+            </Pressable>
+          )}
+          <Pressable
+            onPress={() => router.push('/filters')}
+            hitSlop={8}
+            style={styles.headerBtn}
+            accessibilityRole="button"
+            accessibilityLabel={activeCount > 0 ? `Filters, ${activeCount} active` : 'Filters'}
+          >
+            <Feather name="sliders" color={color.text} size={20} />
+            {activeCount > 0 && (
+              <View style={styles.headerBadge}>
+                <Text style={styles.headerBadgeText}>{activeCount > 9 ? '9+' : activeCount}</Text>
+              </View>
+            )}
+          </Pressable>
+        </View>
+      ),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigation, undoStack, undoing, activeCount, router]);
+
   const pan = Gesture.Pan()
     .onBegin(() => {
       cueLatched.value = false;
@@ -396,21 +450,37 @@ export default function DeckScreen() {
     })
     .onEnd((e) => {
       if (busyShared.value) return;
-      if (e.translationX > motion.SWIPE_THRESHOLD_X) {
-        runOnJS(commitExit)('watched', 'swipe');
-        return;
-      }
-      if (e.translationX < -motion.SWIPE_THRESHOLD_X) {
-        runOnJS(commitExit)('unwatched', 'swipe');
-        return;
-      }
-      if (e.translationY < -motion.SWIPE_THRESHOLD_Y) {
-        runOnJS(commitExit)('watch_later', 'swipe');
-        return;
-      }
-      if (e.translationY > motion.SWIPE_THRESHOLD_Y) {
-        runOnJS(commitExit)('review_later', 'swipe');
-        return;
+      // A fast flick commits even short of the distance threshold — a
+      // quick flick and a slow deliberate drag both read as "intentional"
+      // to a person, so both should be able to commit; requiring flicks to
+      // travel just as far as a slow drag is what made this feel tiring.
+      // `horizontalDominant` picks which axis's thresholds apply so a
+      // mostly-vertical flick can't accidentally register a stray
+      // horizontal velocity component as a left/right commit, and vice
+      // versa.
+      const horizontalDominant = Math.abs(e.translationX) >= Math.abs(e.translationY);
+      if (horizontalDominant) {
+        const fastRight = e.velocityX > motion.VELOCITY_THRESHOLD && e.translationX > 20;
+        const fastLeft = e.velocityX < -motion.VELOCITY_THRESHOLD && e.translationX < -20;
+        if (e.translationX > motion.SWIPE_THRESHOLD_X || fastRight) {
+          runOnJS(commitExit)('watched', 'swipe');
+          return;
+        }
+        if (e.translationX < -motion.SWIPE_THRESHOLD_X || fastLeft) {
+          runOnJS(commitExit)('unwatched', 'swipe');
+          return;
+        }
+      } else {
+        const fastUp = e.velocityY < -motion.VELOCITY_THRESHOLD && e.translationY < -20;
+        const fastDown = e.velocityY > motion.VELOCITY_THRESHOLD && e.translationY > 20;
+        if (e.translationY < -motion.SWIPE_THRESHOLD_Y || fastUp) {
+          runOnJS(commitExit)('watch_later', 'swipe');
+          return;
+        }
+        if (e.translationY > motion.SWIPE_THRESHOLD_Y || fastDown) {
+          runOnJS(commitExit)('review_later', 'swipe');
+          return;
+        }
       }
       tx.value = withSpring(0, motion.SPRING);
       ty.value = withSpring(0, motion.SPRING);
@@ -443,14 +513,14 @@ export default function DeckScreen() {
   if (!current) {
     if (!initialLoadDone) {
       return (
-        <View style={[styles.center, { paddingTop: insets.top }]} accessibilityLabel="Loading deck">
+        <View style={[styles.center, { paddingTop: insets.top + HEADER_HEIGHT }]} accessibilityLabel="Loading deck">
           <Text style={styles.muted}>Loading deck…</Text>
         </View>
       );
     }
     if (loadError) {
       return (
-        <View style={[styles.center, { paddingTop: insets.top }]}>
+        <View style={[styles.center, { paddingTop: insets.top + HEADER_HEIGHT }]}>
           <Text style={styles.errorText}>{loadError}</Text>
           <Pressable
             style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
@@ -468,7 +538,7 @@ export default function DeckScreen() {
       );
     }
     return (
-      <View style={[styles.center, { paddingTop: insets.top }]}>
+      <View style={[styles.center, { paddingTop: insets.top + HEADER_HEIGHT }]}>
         <Text style={styles.muted}>No titles match — try again later</Text>
       </View>
     );
@@ -482,14 +552,42 @@ export default function DeckScreen() {
   // mnemonic row.
   return (
     <View style={styles.container}>
-      <Text style={styles.hint}>← Haven&apos;t</Text>
-      <View style={styles.hintRow}>
-        <Text style={styles.hint}>↑ Watch Later</Text>
-        <Text style={styles.hint}>↓ Review Later</Text>
-      </View>
-      <Text style={styles.hint}>Watched →</Text>
+      {/* A plain black background read as "off" — this is the poster's own
+          artwork blurred into an ambient backdrop (RN Image's native
+          blurRadius, no extra processing needed) with a frosted BlurView
+          on top for the actual "glass" quality, instead of a separate
+          color-extraction step. Every card gets its own backdrop for free
+          since it's just the same image, blurred. Deliberately NOT inside
+          `content` below — it fills the entire screen, unpadded, so it
+          shows through behind the now-transparent header and floating tab
+          bar instead of stopping at their old solid edges. */}
+      {poster && (
+        <>
+          <Image
+            source={{ uri: poster }}
+            style={StyleSheet.absoluteFillObject}
+            resizeMode="cover"
+            blurRadius={35}
+          />
+          <View style={styles.backdropScrim} />
+          <BlurView intensity={55} tint="dark" style={StyleSheet.absoluteFillObject} />
+        </>
+      )}
 
-      <GestureDetector gesture={pan}>
+      <View
+        style={[
+          styles.content,
+          { paddingTop: insets.top + HEADER_HEIGHT, paddingBottom: insets.bottom + TAB_BAR_HEIGHT },
+        ]}
+      >
+        <Text style={styles.hint}>← Haven&apos;t</Text>
+        <View style={styles.hintRow}>
+          <Text style={styles.hint}>↑ Watch Later</Text>
+          <Text style={styles.hint}>↓ Review Later</Text>
+        </View>
+        <Text style={styles.hint}>Watched →</Text>
+
+        <GestureDetector gesture={pan}>
         <Animated.View style={[styles.card, cardStyle]}>
           {/* Double border: a thin outer frame with a visible gap, then the
               poster's own (thicker, accent-colored) border — a picture-mat
@@ -533,25 +631,6 @@ export default function DeckScreen() {
               <Animated.View style={[styles.cue, styles.cueDown, downCueStyle]} pointerEvents="none">
                 <Feather name="bookmark" size={44} color={color.review} />
               </Animated.View>
-
-              {/* Undo used to be a full-width pill ABOVE the poster — read
-                  as a primary action when it's actually a rare, secondary
-                  utility. A small corner chip on the poster itself keeps it
-                  reachable without claiming its own row. */}
-              {undoStack.length > 0 && (
-                <Pressable
-                  onPress={handleUndo}
-                  disabled={undoing}
-                  hitSlop={hitSlopFor(28)}
-                  style={({ pressed }) => [styles.undoChip, pressed && styles.pressed]}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Undo marking ${undoStack[0].title}`}
-                  accessibilityState={{ disabled: undoing }}
-                >
-                  <Feather name="rotate-ccw" size={12} color={color.text} />
-                  <Text style={styles.undoChipText}>{undoing ? 'Undoing…' : 'Undo'}</Text>
-                </Pressable>
-              )}
             </View>
           </View>
 
@@ -572,21 +651,24 @@ export default function DeckScreen() {
             <Text style={styles.imdbLink}>{imdbLoading ? 'Opening…' : 'IMDb ↗'}</Text>
           </Pressable>
         </Animated.View>
-      </GestureDetector>
+        </GestureDetector>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: color.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: space.lg,
-  },
+  // Unpadded — the blurred backdrop is a direct child of this so it fills
+  // the literal full screen, behind the transparent header/tab bar. All
+  // the actual padding/centering lives on `content` instead.
+  container: { flex: 1, backgroundColor: color.bg },
+  content: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: space.lg },
   center: { flex: 1, backgroundColor: color.bg, alignItems: 'center', justifyContent: 'center', padding: space.xl },
   posterPlaceholder: { backgroundColor: color.surfaceHigh },
+  // Scrim between the blurred poster backdrop and the frosted BlurView on
+  // top of it — keeps the ambient color from either washing out the frame
+  // (too bright) or going fully black (defeats the point of it).
+  backdropScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(9,9,11,0.45)' },
   hintRow: { flexDirection: 'row', gap: space.lg },
   hint: { color: color.textMuted, fontSize: type.caption.fontSize, fontWeight: '700', marginVertical: 2 },
   pressed: { opacity: 0.7 },
@@ -598,9 +680,9 @@ const styles = StyleSheet.create({
   frameOuter: {
     padding: FRAME_GAP,
     borderWidth: FRAME_BORDER,
-    borderColor: color.border,
+    borderColor: 'rgba(255,255,255,0.22)',
     borderRadius: radius.lg,
-    backgroundColor: color.bg,
+    backgroundColor: 'rgba(24,24,27,0.5)',
   },
   posterWrap: {
     width: POSTER_WIDTH,
@@ -611,19 +693,35 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   poster: { width: '100%', height: '100%' },
-  undoChip: {
-    position: 'absolute',
-    top: space.sm,
-    right: space.sm,
+  // Header row (Undo + Filters) — injected via navigation.setOptions in
+  // the component body, not rendered here directly, but styled here
+  // alongside everything else on this screen.
+  headerRightRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginRight: space.sm },
+  headerUndoBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(9,9,11,0.72)',
+    minHeight: 36,
+    backgroundColor: color.surfaceHigh,
     borderRadius: radius.pill,
-    paddingVertical: 5,
-    paddingHorizontal: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
   },
-  undoChipText: { color: color.text, fontSize: 10, fontWeight: '600' },
+  headerUndoText: { color: color.text, fontSize: type.caption.fontSize, fontWeight: '600' },
+  headerBtn: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  headerBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: color.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  headerBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
   errorText: { color: color.danger, fontSize: type.body.fontSize, textAlign: 'center', marginBottom: space.lg },
   retryButton: {
     backgroundColor: color.surface,
