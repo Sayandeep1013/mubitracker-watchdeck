@@ -28,6 +28,12 @@ export class AuthError extends Error {
 }
 
 export function apiError(code: string, message: string, status = 400) {
+  if (status >= 500) {
+    // Every route funnels its error responses through here, so this is the
+    // one place that needs to log for "an error reporter captures an API
+    // error" (spec 50 §6) to hold everywhere, without touching 30 files.
+    console.error(JSON.stringify({ evt: 'api.error', code, message, status }));
+  }
   return Response.json({ error: { code, message } }, { status });
 }
 
