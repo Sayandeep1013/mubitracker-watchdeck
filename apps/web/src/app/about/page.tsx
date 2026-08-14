@@ -3,7 +3,7 @@ import Link from 'next/link';
 
 export default function AboutPage() {
   return (
-    <div className="mx-auto max-w-lg p-4">
+    <div className="mx-auto w-full max-w-lg p-4 lg:max-w-2xl xl:max-w-3xl">
       <Link href="/profile" className="mb-4 inline-block text-sm text-zinc-500">
         ← Back
       </Link>

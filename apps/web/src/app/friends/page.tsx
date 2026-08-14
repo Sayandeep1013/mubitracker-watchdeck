@@ -151,7 +151,7 @@ function FriendsPageInner() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl p-4">
+    <div className="mx-auto w-full max-w-2xl p-4 lg:max-w-3xl xl:max-w-4xl">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Friends</h1>
         {myUsername && (

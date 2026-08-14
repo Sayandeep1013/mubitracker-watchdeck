@@ -62,7 +62,7 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl p-4">
+    <div className="mx-auto w-full max-w-2xl p-4 lg:max-w-3xl xl:max-w-4xl">
       <h1 className="mb-4 text-2xl font-bold text-white">Search</h1>
       <div className="mb-4 flex gap-2">
         <input

@@ -62,7 +62,7 @@ export function DeckCard({
 
   return (
     <div
-      className={`flex w-full max-w-md flex-col items-center gap-4 ${
+      className={`flex w-full max-w-md flex-col items-center gap-3 ${
         entering && !exitDirection ? 'animate-deck-enter' : ''
       } ${exitClass}`}
       style={
@@ -75,7 +75,12 @@ export function DeckCard({
             }
       }
     >
-      <div className="relative aspect-[2/3] w-56 overflow-hidden rounded-xl border border-white/5 bg-neutral-950 shadow-[0_0_60px_rgba(239,68,68,0.08)] sm:w-64">
+      {/* Height-driven, not width-driven: a fixed width (the old `w-56`)
+          produces a fixed height via the aspect-ratio regardless of viewport
+          height, which is exactly what didn't fit on short screens. Sizing
+          off `dvh` instead lets the poster shrink on short viewports before
+          anything below it runs out of room. */}
+      <div className="relative aspect-[2/3] h-[clamp(160px,32dvh,320px)] w-auto max-w-[70vw] overflow-hidden rounded-xl border border-white/5 bg-neutral-950 shadow-[0_0_60px_rgba(239,68,68,0.08)]">
         {posterUrl ? (
           <Image src={posterUrl} alt={item.title} fill className="object-cover" unoptimized />
         ) : (
@@ -105,7 +110,7 @@ export function DeckCard({
       </div>
 
       <div className="text-center">
-        <h2 className="text-2xl font-bold tracking-tight text-white">{item.title}</h2>
+        <h2 className="text-xl font-bold tracking-tight text-white sm:text-2xl">{item.title}</h2>
         <p className="mt-1 text-sm text-neutral-500">
           {item.year ?? '—'} · {item.displayType} · {item.originalLanguage.toUpperCase()}
         </p>
@@ -113,13 +118,13 @@ export function DeckCard({
           type="button"
           onClick={openImdb}
           disabled={imdbLoading}
-          className="mt-2 inline-flex items-center gap-1 text-xs text-neutral-600 transition-colors hover:text-amber-400 disabled:opacity-50"
+          className="mt-1.5 inline-flex items-center gap-1 text-xs text-neutral-600 transition-colors hover:text-amber-400 disabled:opacity-50"
         >
           <IconExternalLink size={12} />
           {imdbLoading ? 'Opening…' : 'IMDb'}
         </button>
         {item.overview && (
-          <p className="mt-3 line-clamp-3 max-w-md text-sm text-neutral-600">{item.overview}</p>
+          <p className="mt-2 line-clamp-2 max-w-md text-sm text-neutral-600">{item.overview}</p>
         )}
       </div>
 
@@ -199,8 +204,8 @@ export function DeckCard({
 /** Mirrors DeckCard's exact dimensions so real content never shifts layout on arrival. */
 export function DeckCardSkeleton() {
   return (
-    <div className="flex w-full max-w-md flex-col items-center gap-4 animate-pulse">
-      <div className="aspect-[2/3] w-56 rounded-xl bg-neutral-900 sm:w-64" />
+    <div className="flex w-full max-w-md flex-col items-center gap-3 animate-pulse">
+      <div className="aspect-[2/3] h-[clamp(160px,32dvh,320px)] w-auto max-w-[70vw] rounded-xl bg-neutral-900" />
       <div className="flex flex-col items-center gap-2">
         <div className="h-6 w-40 rounded bg-neutral-900" />
         <div className="h-3 w-24 rounded bg-neutral-900" />

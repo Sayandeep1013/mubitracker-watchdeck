@@ -523,7 +523,16 @@ export function DeckView() {
   }
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center px-4 py-8">
+    // `justify-center` alone: when the card's natural height exceeds the
+    // viewport (short phones, short desktop windows), plain centering
+    // pushes content equally past both the top *and* the bottom — including
+    // past the fixed mobile nav bar, with nothing to scroll to reach it.
+    // `justify-[safe_center]` is the CSS-native fix for exactly this: center
+    // when it fits, fall back to start-alignment (scrollable from the top)
+    // the moment it doesn't, instead of clipping symmetrically. `overflow-y-
+    // auto` is the fallback for whatever still doesn't fit even after
+    // DeckCard's own viewport-relative sizing below.
+    <div className="flex flex-1 flex-col items-center justify-[safe_center] overflow-y-auto px-4 py-4 sm:py-8">
       <div className="mb-4 flex w-full max-w-md items-center justify-between">
         <button
           type="button"

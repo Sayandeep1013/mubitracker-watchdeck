@@ -50,9 +50,14 @@ test.describe('Collection pagination', () => {
     const firstPageTitles = await titles.allTextContents();
     expect(firstPageTitles.length).toBeGreaterThan(0);
 
-    await expect(page.getByRole('button', { name: /Prev/ })).toBeDisabled();
+    await expect(pager.getByRole('button', { name: /Prev/ })).toBeDisabled();
 
-    await page.getByRole('button', { name: /Next/ }).click();
+    // Scoped to the pager nav, not a bare page-wide query — Next.js's dev
+    // tools overlay (next dev only, never in production) adds its own
+    // "Open Next.js Dev Tools" button whose accessible name also matches
+    // a loose /Next/ regex, which made this a strict-mode violation when
+    // testing locally against `next dev` instead of a production build.
+    await pager.getByRole('button', { name: /Next/ }).click();
     await expect(pager).toContainText('Page 2 of');
     await settled();
 
@@ -63,7 +68,7 @@ test.describe('Collection pagination', () => {
       'page 2 shows different items than page 1',
     ).not.toEqual(firstPageTitles);
 
-    await page.getByRole('button', { name: /Prev/ }).click();
+    await pager.getByRole('button', { name: /Prev/ }).click();
     await expect(pager).toContainText('Page 1 of');
     await settled();
     expect(await titles.allTextContents()).toEqual(firstPageTitles);
@@ -73,8 +78,9 @@ test.describe('Collection pagination', () => {
     await loginViaUi(page, username);
     await page.goto('/collection');
 
-    await page.getByRole('button', { name: /Next/ }).click();
-    await expect(page.getByRole('navigation', { name: 'Collection pages' })).toContainText('Page 2');
+    const pagerNav = page.getByRole('navigation', { name: 'Collection pages' });
+    await pagerNav.getByRole('button', { name: /Next/ }).click();
+    await expect(pagerNav).toContainText('Page 2');
 
     await page.getByRole('button', { name: 'Movies', exact: true }).click();
 

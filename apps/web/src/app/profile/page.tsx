@@ -106,7 +106,7 @@ export default function ProfilePage() {
   if (!profile) return <div className="p-4 text-neutral-600">Loading...</div>;
 
   return (
-    <div className="mx-auto max-w-lg p-4">
+    <div className="mx-auto w-full max-w-lg p-4 lg:max-w-2xl xl:max-w-3xl">
       <h1 className="mb-2 text-2xl font-bold text-white">Profile</h1>
       <p className="mb-6 text-neutral-500">@{profile.username}</p>
 

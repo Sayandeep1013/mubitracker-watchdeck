@@ -24,8 +24,17 @@ test.describe('Signup → deck → classify → collection', () => {
     const title = await page.locator('h2').first().textContent();
     expect(title, 'card has a title before classifying').toBeTruthy();
 
+    // The exit/enter card animation is driven client-side and finishes
+    // independent of the classify PUT actually persisting — waiting only for
+    // the next card to render (not for this response) let the test navigate
+    // to Collection before the write had landed, an intermittent race, not
+    // an app bug.
+    const classifyResponse = page.waitForResponse(
+      (res) => res.url().includes('/api/v1/user-media/') && res.request().method() === 'PUT',
+    );
     await page.keyboard.press('ArrowRight');
     await page.keyboard.press('Enter');
+    await classifyResponse;
 
     // The card exits and the next one enters — confirms the classify didn't
     // just silently fail and leave the same card on screen.
