@@ -81,6 +81,8 @@ jobs:
         env:
           BASE_URL: ${{ vars.STAGING_URL }}
           QA_TEST_PASSWORD: ${{ secrets.QA_TEST_PASSWORD }}
+          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          E2E_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
 
   # User journeys through the real UI (spec 50 §4). Same STAGING_URL
   # caveat as contract-smoke above.

@@ -4,20 +4,28 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.resolve(__dirname, '../apps/web/.env.local');
-const env = Object.fromEntries(
-  fs
-    .readFileSync(envPath, 'utf8')
-    .split(/\r?\n/)
-    .filter((l) => l && !l.startsWith('#') && l.includes('='))
-    .map((l) => {
-      const i = l.indexOf('=');
-      return [l.slice(0, i).trim(), l.slice(i + 1).trim().replace(/^["']|["']$/g, '')];
-    }),
-);
+// .env.local is gitignored and won't exist on a fresh CI checkout — fall
+// back to process.env (CI sets E2E_SUPABASE_URL/E2E_SUPABASE_ANON_KEY)
+// instead of crashing on ENOENT.
+let fileEnv = {};
+try {
+  fileEnv = Object.fromEntries(
+    fs
+      .readFileSync(envPath, 'utf8')
+      .split(/\r?\n/)
+      .filter((l) => l && !l.startsWith('#') && l.includes('='))
+      .map((l) => {
+        const i = l.indexOf('=');
+        return [l.slice(0, i).trim(), l.slice(i + 1).trim().replace(/^["']|["']$/g, '')];
+      }),
+  );
+} catch {
+  // no local .env.local — rely on process.env below
+}
 
 const BASE = process.env.BASE_URL || 'http://localhost:3000';
-const SUPABASE_URL = env.NEXT_PUBLIC_SUPABASE_URL;
-const ANON = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SUPABASE_URL = process.env.E2E_SUPABASE_URL || fileEnv.NEXT_PUBLIC_SUPABASE_URL;
+const ANON = process.env.E2E_SUPABASE_ANON_KEY || fileEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const stamp = Date.now().toString().slice(-8);
 // wqa* prefix (spec 50 §5) so cleanup-test-accounts.mjs's allowlist catches
 // this script's accounts too — `deck_` is kept in that allowlist only for

@@ -23,21 +23,31 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.resolve(__dirname, '../apps/web/.env.local');
-const env = Object.fromEntries(
-  fs
-    .readFileSync(envPath, 'utf8')
-    .split(/\r?\n/)
-    .filter((l) => l && !l.startsWith('#') && l.includes('='))
-    .map((l) => {
-      const i = l.indexOf('=');
-      return [l.slice(0, i).trim(), l.slice(i + 1).trim().replace(/^["']|["']$/g, '')];
-    }),
-);
+// .env.local is gitignored and won't exist on a fresh CI checkout (this
+// script runs in nightly.yml) — fall back to process.env instead of
+// crashing on ENOENT.
+let fileEnv = {};
+try {
+  fileEnv = Object.fromEntries(
+    fs
+      .readFileSync(envPath, 'utf8')
+      .split(/\r?\n/)
+      .filter((l) => l && !l.startsWith('#') && l.includes('='))
+      .map((l) => {
+        const i = l.indexOf('=');
+        return [l.slice(0, i).trim(), l.slice(i + 1).trim().replace(/^["']|["']$/g, '')];
+      }),
+  );
+} catch {
+  // no local .env.local — rely on process.env below
+}
 
-const SUPABASE_URL = env.NEXT_PUBLIC_SUPABASE_URL;
-const SERVICE_ROLE_KEY = env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_URL = process.env.E2E_SUPABASE_URL || fileEnv.NEXT_PUBLIC_SUPABASE_URL;
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || fileEnv.SUPABASE_SERVICE_ROLE_KEY;
 if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-  console.error('Missing NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY in apps/web/.env.local');
+  console.error(
+    'Missing Supabase URL / service role key — set apps/web/.env.local locally, or E2E_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY in CI.',
+  );
   process.exit(1);
 }
 
