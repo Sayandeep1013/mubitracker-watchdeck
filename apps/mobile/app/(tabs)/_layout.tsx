@@ -163,6 +163,13 @@ export default function TabLayout() {
           // reading as lag — slides can afford the longer curve, fades can't.
           animation: 'fade',
           transitionSpec: { animation: 'timing', config: { duration: 300 } },
+          // Required *because* of the cross-fade above: mid-blend both the
+          // outgoing and incoming scene sit at partial opacity, so anything
+          // not painted by them shows through — and what's behind is the
+          // app's own window background, which is white. That's the white
+          // frame on Watch Later/Review Later. An opaque scene background
+          // means there's never a transparent moment to see through.
+          sceneStyle: { backgroundColor: themeColor.bg },
         };
       }}
     >

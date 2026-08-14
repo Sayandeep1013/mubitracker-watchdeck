@@ -1,6 +1,23 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { InteractionManager, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  BackHandler,
+  Dimensions,
+  InteractionManager,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import Animated, {
+  Easing,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   FILTER_TYPE_OPTIONS,
@@ -15,6 +32,10 @@ import { apiClient } from '@/lib/api';
 import { useFilters } from '@/lib/filters';
 import { useToast } from '@/components/Toast';
 import { color, glassChip, radius, space, type } from '@/lib/theme';
+
+const SHEET_TRAVEL = Dimensions.get('window').height;
+const OPEN_MS = 320;
+const CLOSE_MS = 260;
 
 const GENRE_NAMES = Object.keys(GENRE_MAP);
 const LANGUAGES = ['en', 'ja', 'ko', 'hi', 'bn', 'de', 'fr', 'es'];
@@ -39,6 +60,61 @@ export default function FiltersScreen() {
   const [presetName, setPresetName] = useState('');
   const [presets, setPresets] = useState<FilterPreset[]>([]);
   const [saving, setSaving] = useState(false);
+
+  // The sheet's motion is driven here rather than by the navigator's
+  // `animation` option. On Android this version of react-native-screens
+  // animates the vertical presets (`slide_from_bottom`, `fade_from_bottom`)
+  // on push but cuts instantly on pop — established by high-rate on-device
+  // capture: opening reliably produced mid-slide frames, closing produced
+  // zero across every run, for both the Close button and hardware back.
+  // Horizontal (`slide_from_right`) pops fine, which is why the rest of the
+  // app uses it, but Filters should read as a sheet coming up and going back
+  // down. Reanimated drives both directions itself, so the close is
+  // symmetric with the open by construction — the same approach MenuDrawer
+  // already uses here.
+  const translateY = useSharedValue(SHEET_TRAVEL);
+  const backdrop = useSharedValue(0);
+  const dismissing = useRef(false);
+
+  useEffect(() => {
+    translateY.value = withTiming(0, { duration: OPEN_MS, easing: Easing.out(Easing.cubic) });
+    backdrop.value = withTiming(1, { duration: OPEN_MS });
+  }, [translateY, backdrop]);
+
+  // `router.back()` only ever runs once the slide-down has finished, so the
+  // screen is never torn out from under its own exit animation.
+  const dismiss = useCallback(
+    (onClosed?: () => void) => {
+      if (dismissing.current) return;
+      dismissing.current = true;
+      const finish = () => {
+        router.back();
+        if (onClosed) InteractionManager.runAfterInteractions(onClosed);
+      };
+      backdrop.value = withTiming(0, { duration: CLOSE_MS });
+      translateY.value = withTiming(
+        SHEET_TRAVEL,
+        { duration: CLOSE_MS, easing: Easing.in(Easing.cubic) },
+        (finished) => {
+          if (finished) runOnJS(finish)();
+        },
+      );
+    },
+    [router, translateY, backdrop],
+  );
+
+  // Hardware back has to run the same animated path, or it pops instantly and
+  // the sheet vanishes without sliding down.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      dismiss();
+      return true;
+    });
+    return () => sub.remove();
+  }, [dismiss]);
+
+  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: translateY.value }] }));
+  const backdropStyle = useAnimatedStyle(() => ({ opacity: backdrop.value }));
 
   const loadPresets = () => {
     apiClient
@@ -133,22 +209,29 @@ export default function FiltersScreen() {
   // frames and made the close feel jarry. Firing `router.back()` first and
   // deferring the state update past the transition (`runAfterInteractions`)
   // keeps the dismiss animation on its own uncontested frames.
-  const apply = () => {
-    router.back();
-    InteractionManager.runAfterInteractions(() => setFilters(local));
-  };
+  // `setFilters` fires Deck's `[filters]` effect (a refetch) synchronously on
+  // the JS thread, so it's deferred until after the sheet has finished
+  // sliding down rather than competing with it for frames.
+  const apply = () => dismiss(() => setFilters(local));
 
-  const clear = () => {
-    router.back();
-    InteractionManager.runAfterInteractions(() => setFilters({}));
-  };
+  const clear = () => dismiss(() => setFilters({}));
 
   return (
-    <SafeAreaView style={styles.flex} edges={['top', 'bottom']}>
+    <View style={styles.root}>
+      <Animated.View style={[styles.backdrop, backdropStyle]}>
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => dismiss()}
+          accessibilityRole="button"
+          accessibilityLabel="Close filters"
+        />
+      </Animated.View>
+      <Animated.View style={[styles.sheet, sheetStyle]}>
+      <SafeAreaView style={styles.flex} edges={['bottom']}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Filters</Text>
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => dismiss()}
           hitSlop={8}
           style={styles.closeHit}
           accessibilityRole="button"
@@ -281,7 +364,9 @@ export default function FiltersScreen() {
           <Text style={styles.applyBtnText}>Apply Filters</Text>
         </Pressable>
       </View>
-    </SafeAreaView>
+      </SafeAreaView>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -321,6 +406,20 @@ function Chip({
 }
 
 const styles = StyleSheet.create({
+  // Transparent so the Deck stays visible behind the sheet as it travels —
+  // paired with `presentation: 'transparentModal'` on the route.
+  root: { flex: 1 },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' },
+  sheet: {
+    flex: 1,
+    marginTop: 56,
+    backgroundColor: color.bg,
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    overflow: 'hidden',
+    borderTopWidth: 1,
+    borderColor: color.border,
+  },
   flex: { flex: 1, backgroundColor: color.bg },
   header: {
     flexDirection: 'row',

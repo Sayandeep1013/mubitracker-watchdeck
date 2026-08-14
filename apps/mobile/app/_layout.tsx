@@ -108,44 +108,70 @@ export default function RootLayout() {
                     <View style={styles.root}>
                       {/* `contentStyle` matters here: without it the native stack
                           defaults each screen's container to white, which flashes
-                          for a frame during a modal's slide-up (or any push)
-                          before that screen's own dark View mounts and paints —
-                          confirmed live as "a white page shows up for a second"
-                          opening Filters. `animation: 'slide_from_bottom'` on the
-                          modal screens is what actually makes them read as a
-                          modal sliding up rather than a same-direction full page
-                          push, which is otherwise indistinguishable on Android. */}
+                          for a frame during a slide-up (or any push) before that
+                          screen's own dark View mounts and paints — confirmed
+                          live as "a white page shows up for a second" opening
+                          Filters.
+
+                          Dropping `presentation: 'modal'` is deliberate: with
+                          modal presentation Android hands the screen to a
+                          separate native container carrying the app theme's own
+                          (white) window background, which is where the white
+                          flash on close came from. */}
                       <Stack
                         screenOptions={{
                           headerShown: false,
                           contentStyle: { backgroundColor: color.bg },
-                          // Android's native-stack default (~300ms) read as
-                          // "too quick and snappy, abrupt" on both open AND
-                          // close — confirmed live. Applied once here so
-                          // every push/modal (including the ones below that
-                          // only override `animation`) shares the same
-                          // slower, more deliberate feel both directions.
-                          animationDuration: 420,
+                          // `slide_from_right`, NOT `slide_from_bottom`: on
+                          // Android this version of react-native-screens
+                          // animates slide_from_bottom on push but cuts
+                          // instantly on pop — "it just stops suddenly".
+                          // Established by high-rate on-device capture
+                          // (screencap looping on the device itself, ~100ms
+                          // apart, so a sub-200ms transition can't hide between
+                          // frames): opening reliably produced a mid-slide
+                          // frame, closing produced ZERO intermediate frames
+                          // across every run and both triggers (Close button
+                          // and hardware back). Switching only the animation to
+                          // slide_from_right made an intermediate pop frame
+                          // appear immediately, with nothing else changed.
+                          // `animationDuration` is deliberately absent — it is
+                          // iOS-only, so it was a no-op on Android throughout.
+                          animation: 'slide_from_right',
                         }}
                       >
                         <Stack.Screen name="(tabs)" />
                         <Stack.Screen name="login" />
                         <Stack.Screen
                           name="review/[id]"
-                          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+                          options={{ animation: 'slide_from_right' }}
                         />
                         <Stack.Screen
                           name="friends/add"
-                          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+                          options={{ animation: 'slide_from_right' }}
                         />
                         <Stack.Screen
                           name="friends/notifications"
-                          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+                          options={{ animation: 'slide_from_right' }}
                         />
                         <Stack.Screen name="friends/[id]" />
+                        {/* Filters is the one screen that should read as a
+                            sheet coming up and going back down, not a sideways
+                            page push. */}
                         <Stack.Screen
                           name="filters"
-                          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+                          options={{
+                            // `animation: 'none'` is deliberate: filters.tsx
+                            // animates its own sheet with Reanimated, which is
+                            // the only way to get a symmetric up/down here (see
+                            // the note there). A native animation on top of
+                            // that would double up. `transparentModal` +
+                            // transparent contentStyle keep the Deck visible
+                            // behind the sheet while it travels.
+                            presentation: 'transparentModal',
+                            animation: 'none',
+                            contentStyle: { backgroundColor: 'transparent' },
+                          }}
                         />
                       </Stack>
                       <MenuDrawer />

@@ -8,6 +8,7 @@
     "scheme": "mubitracker",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
+    "backgroundColor": "#09090b",
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
@@ -22,7 +23,8 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#09090b"
       },
-      "package": "app.mubitracker.mobile"
+      "package": "app.mubitracker.mobile",
+      "backgroundColor": "#09090b"
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
