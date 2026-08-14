@@ -15,7 +15,7 @@ import {
   type WatchStatus,
 } from '@mubitracker/shared';
 import { tmdbDiscover } from '@/lib/tmdb/provider';
-import { asDbMedia, toMediaSummary, upsertMediaBatch } from '@/lib/media/repository';
+import { asDbMedia, attachGenreNames, toMediaSummary, upsertMediaBatch } from '@/lib/media/repository';
 import { isHiddenNow } from '@/lib/deck/cooldown';
 import { getRecentImpressions, recordImpressions } from '@/lib/deck/impressions';
 import { friendshipPairFilter } from '@/lib/social/friends';
@@ -370,7 +370,7 @@ async function generateFriendDeck(
     ? encodeCursor({ page: page + 1, format: 'movie', sessionId: session! })
     : null;
 
-  return { items, cursor: nextCursor, sessionId: session! };
+  return { items: await attachGenreNames(supabase, items), cursor: nextCursor, sessionId: session! };
 }
 
 export interface DeckCursor {
@@ -535,7 +535,9 @@ export async function generateDeck(
     }
   }
 
-  const served = finalItems.slice(0, limit);
+  // Only the served page pays the extra query — the rest of finalItems
+  // (over-fetched candidates that lost the slice) never need genre names.
+  const served = await attachGenreNames(supabase, finalItems.slice(0, limit));
   if (served.length > 0) {
     await recordImpressions(supabase, userId, served.map((i) => i.id));
   }

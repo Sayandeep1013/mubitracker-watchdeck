@@ -30,10 +30,37 @@ export async function GET(request: NextRequest) {
     const reviewStatus = searchParams.get('review_status');
     const format = asMediaFormat(searchParams.get('format'));
     const classification = asClassification(searchParams.get('classification'));
+    const language = searchParams.get('language');
+    const genre = searchParams.get('genre');
     const sort = searchParams.get('sort') ?? 'recent';
     const q = searchParams.get('q');
 
     const supabase = createSupabaseAdminClient();
+
+    // `genre` has no column on `user_media`/`media` — resolve it to a set of
+    // media ids via the `media_genres` join table first, same lookup
+    // attachGenreNames() does in reverse (name->rows here, id->name there).
+    // Accepts a comma-separated list of exact TMDB genre names, because the
+    // movie/TV id space genuinely uses different names for the same concept
+    // (movie 878 "Science Fiction" vs TV 10765 "Sci-Fi & Fantasy") — a
+    // single-name lookup would silently miss one format. An empty match
+    // (unknown name(s), or no titles in it) short-circuits to an empty page
+    // instead of falling through to an unfiltered query.
+    let genreMediaIds: string[] | null = null;
+    if (genre) {
+      const names = genre.split(',').map((n) => n.trim()).filter(Boolean);
+      const { data: genreRows } = await supabase.from('genres').select('id').in('name', names);
+      const genreIds = (genreRows ?? []).map((g) => g.id);
+      genreMediaIds = genreIds.length
+        ? ((await supabase.from('media_genres').select('media_id').in('genre_id', genreIds)).data ?? []).map(
+            (r) => r.media_id as string,
+          )
+        : [];
+      if (genreMediaIds.length === 0) {
+        return apiOk({ items: [], total: 0, page, pageSize });
+      }
+    }
+
     // `!inner` is required so .eq('media.*')/.ilike('media.*') filters below narrow
     // the joined rows (and the exact `count`) instead of only the top-level user_media rows.
     let query = supabase
@@ -45,6 +72,8 @@ export async function GET(request: NextRequest) {
     if (reviewStatus) query = query.eq('review_status', reviewStatus);
     if (format) query = query.eq('media.format', format);
     if (classification) query = query.eq('media.classification', classification);
+    if (language) query = query.eq('media.original_language', language);
+    if (genreMediaIds) query = query.in('media_id', genreMediaIds);
     if (q) query = query.ilike('media.title', `%${escapeLike(q)}%`);
 
     if (sort === 'alpha') {

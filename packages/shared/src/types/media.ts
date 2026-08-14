@@ -13,6 +13,11 @@ export interface MediaSummary {
   backdropPath: string | null;
   runtime: number | null;
   displayType: string;
+  /** Genre names (not ids) — `[]` unless the route explicitly attaches them
+   * via `attachGenreNames()` (repository.ts). Not every route needs this,
+   * so it's not a guaranteed-populated field; treat an empty array as
+   * "not fetched" as much as "genuinely no genres". */
+  genres: string[];
 }
 
 export interface DeckItem extends MediaSummary {

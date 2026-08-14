@@ -16,7 +16,7 @@ import type { MediaSummary } from '@mubitracker/shared';
 import { tmdbPosterUrl } from '@mubitracker/shared';
 import { apiClient } from '@/lib/api';
 import { useToast } from '@/components/Toast';
-import { color, radius, space, type } from '@/lib/theme';
+import { color, glassChip, radius, space, type } from '@/lib/theme';
 
 export default function WriteReviewScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -103,6 +103,7 @@ export default function WriteReviewScreen() {
         <Pressable
           style={({ pressed }) => [
             styles.btn,
+            glassChip(),
             (pressed || saving) && styles.pressed,
             !body.trim() && styles.disabled,
           ]}
@@ -138,14 +139,12 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   btn: {
-    backgroundColor: color.primary,
     padding: space.lg,
-    borderRadius: radius.sm,
     margin: space.lg,
     minHeight: 48,
     justifyContent: 'center',
   },
   disabled: { opacity: 0.5 },
   pressed: { opacity: 0.8 },
-  btnText: { color: color.onPrimary, textAlign: 'center', fontWeight: '600' },
+  btnText: { color: color.primary, textAlign: 'center', fontWeight: '700' },
 });

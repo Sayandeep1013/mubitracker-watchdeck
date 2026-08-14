@@ -1,16 +1,19 @@
 import { useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { tmdbPosterUrl } from '@mubitracker/shared';
 import { apiClient } from '@/lib/api';
 import { useFocusFetch } from '@/lib/useFocusFetch';
 import { ScreenState } from '@/components/ScreenState';
-import { color, radius, space, type } from '@/lib/theme';
+import { color, glassCard, radius, space, type } from '@/lib/theme';
 
 interface PendingItem {
   id: string;
   title: string;
   year: number | null;
   displayType: string;
+  posterPath: string | null;
+  overview: string;
 }
 
 export default function ReviewLaterScreen() {
@@ -45,19 +48,36 @@ export default function ReviewLaterScreen() {
       contentContainerStyle={styles.container}
       refreshing={loading}
       onRefresh={reload}
-      renderItem={({ item }) => (
-        <Pressable
-          style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-          accessibilityRole="button"
-          accessibilityLabel={`Write a review for ${item.title}`}
-          onPress={() => router.push(`/review/${item.id}`)}
-        >
-          <Text style={styles.title}>{item.title}</Text>
-          <Text style={styles.meta}>
-            {item.year ?? '—'} · {item.displayType}
-          </Text>
-        </Pressable>
-      )}
+      renderItem={({ item }) => {
+        const poster = tmdbPosterUrl(item.posterPath, 'card');
+        return (
+          <Pressable
+            style={({ pressed }) => [styles.row, glassCard(), pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel={`Write a review for ${item.title}`}
+            onPress={() => router.push(`/review/${item.id}`)}
+          >
+            {poster ? (
+              <Image source={{ uri: poster }} style={styles.poster} />
+            ) : (
+              <View style={[styles.poster, styles.posterPlaceholder]} />
+            )}
+            <View style={styles.rowBody}>
+              <Text style={styles.title} numberOfLines={2}>
+                {item.title}
+              </Text>
+              <Text style={styles.meta}>
+                {item.year ?? '—'} · {item.displayType}
+              </Text>
+              {item.overview ? (
+                <Text style={styles.overview} numberOfLines={2}>
+                  {item.overview}
+                </Text>
+              ) : null}
+            </View>
+          </Pressable>
+        );
+      }}
     />
   );
 }
@@ -66,13 +86,16 @@ const styles = StyleSheet.create({
   list: { flex: 1, backgroundColor: color.bg },
   container: { padding: space.lg },
   row: {
-    minHeight: 48,
-    padding: space.lg,
-    backgroundColor: color.surface,
-    borderRadius: radius.sm,
+    flexDirection: 'row',
+    gap: space.md,
+    padding: space.sm,
     marginBottom: space.sm,
   },
   pressed: { opacity: 0.6 },
+  poster: { width: 56, height: 84, borderRadius: radius.sm / 2 },
+  posterPlaceholder: { backgroundColor: color.surfaceHigh },
+  rowBody: { flex: 1, justifyContent: 'center' },
   title: { color: color.text, fontWeight: '600' },
   meta: { color: color.textMuted, fontSize: type.caption.fontSize, marginTop: 2 },
+  overview: { color: color.textMuted, fontSize: type.caption.fontSize, marginTop: space.xs, lineHeight: 16 },
 });

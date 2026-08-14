@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { supabase } from '@/lib/supabase';
-import { color, radius, space, type } from '@/lib/theme';
+import { color, glassChip, radius, space, type } from '@/lib/theme';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
 
@@ -92,7 +92,7 @@ export default function LoginScreen() {
           </Text>
         ) : null}
         <Pressable
-          style={({ pressed }) => [styles.btn, pressed && styles.pressed, loading && styles.disabled]}
+          style={({ pressed }) => [styles.btn, glassChip(), pressed && styles.pressed, loading && styles.disabled]}
           onPress={submit}
           disabled={loading}
           accessibilityRole="button"
@@ -135,10 +135,10 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   error: { color: color.danger, marginBottom: space.md, fontSize: type.caption.fontSize },
-  btn: { backgroundColor: color.primary, padding: space.lg, borderRadius: radius.sm, minHeight: 48, justifyContent: 'center' },
+  btn: { padding: space.lg, minHeight: 48, justifyContent: 'center' },
   pressed: { opacity: 0.8 },
   disabled: { opacity: 0.5 },
-  btnText: { color: color.onPrimary, textAlign: 'center', fontWeight: '600' },
+  btnText: { color: color.primary, textAlign: 'center', fontWeight: '700' },
   switchHit: { minHeight: 48, justifyContent: 'center' },
   switch: { color: color.textMuted, textAlign: 'center', marginTop: space.lg },
 });

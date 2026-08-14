@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { useFocusFetch } from '@/lib/useFocusFetch';
 import { ScreenState } from '@/components/ScreenState';
 import { useToast } from '@/components/Toast';
-import { color, radius, space, type } from '@/lib/theme';
+import { color, glassChip, radius, space, type } from '@/lib/theme';
 
 type Visibility = 'public' | 'friends' | 'private';
 
@@ -98,7 +98,7 @@ export default function ProfileScreen() {
       <View style={styles.usernameRow}>
         <Text style={styles.username}>@{data?.username}</Text>
         <Pressable
-          style={({ pressed }) => [styles.copyBtn, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.copyBtn, glassChip(), pressed && styles.pressed]}
           onPress={copyHandle}
           accessibilityRole="button"
           accessibilityLabel="Copy your handle"
@@ -157,7 +157,7 @@ export default function ProfileScreen() {
       </View>
 
       <Pressable
-        style={({ pressed }) => [styles.btn, styles.primaryBtn, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.btn, glassChip(), pressed && styles.pressed]}
         onPress={exportData}
         disabled={exporting}
         accessibilityRole="button"
@@ -168,7 +168,7 @@ export default function ProfileScreen() {
       </Pressable>
 
       <Pressable
-        style={({ pressed }) => [styles.btn, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.btn, glassChip(color.textMuted), pressed && styles.pressed]}
         onPress={() => router.push('/about')}
         accessibilityRole="button"
         accessibilityLabel="About and TMDB credits"
@@ -177,12 +177,12 @@ export default function ProfileScreen() {
       </Pressable>
 
       <Pressable
-        style={({ pressed }) => [styles.btn, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.btn, glassChip(color.danger), pressed && styles.pressed]}
         onPress={signOut}
         accessibilityRole="button"
         accessibilityLabel="Sign out"
       >
-        <Text style={styles.btnText}>Sign Out</Text>
+        <Text style={styles.signOutText}>Sign Out</Text>
       </Pressable>
     </ScrollView>
   );
@@ -211,11 +211,8 @@ const styles = StyleSheet.create({
     minHeight: 48,
     justifyContent: 'center',
     paddingHorizontal: space.md,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: color.surfaceHigh,
   },
-  copyBtnText: { color: color.textMuted, fontSize: type.caption.fontSize, fontWeight: '600' },
+  copyBtnText: { color: color.primary, fontSize: type.caption.fontSize, fontWeight: '700' },
   privacyCard: {
     backgroundColor: color.surface,
     borderRadius: radius.lg,
@@ -237,9 +234,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: radius.sm,
   },
-  segmentActive: { backgroundColor: color.primary },
+  segmentActive: { backgroundColor: `${color.primary}1F`, borderWidth: 1, borderColor: color.primary },
   segmentText: { color: color.textMuted, fontWeight: '600' },
-  segmentTextActive: { color: color.onPrimary },
+  segmentTextActive: { color: color.primary },
   privacyHelper: { color: color.textMuted, fontSize: type.caption.fontSize },
   stats: { flexDirection: 'row', gap: space.md, marginBottom: space.xl },
   statsRowGap: { marginBottom: space.md },
@@ -255,13 +252,11 @@ const styles = StyleSheet.create({
   btn: {
     minHeight: 48,
     justifyContent: 'center',
-    backgroundColor: color.surfaceHigh,
     padding: space.lg,
-    borderRadius: radius.sm,
     marginBottom: space.md,
   },
-  primaryBtn: { backgroundColor: color.primary },
   pressed: { opacity: 0.6 },
-  btnText: { color: color.text, textAlign: 'center', fontWeight: '600' },
-  primaryBtnText: { color: color.onPrimary, textAlign: 'center', fontWeight: '600' },
+  btnText: { color: color.textMuted, textAlign: 'center', fontWeight: '700' },
+  signOutText: { color: color.danger, textAlign: 'center', fontWeight: '700' },
+  primaryBtnText: { color: color.primary, textAlign: 'center', fontWeight: '700' },
 });

@@ -45,9 +45,13 @@ interface EligibleRow {
 /**
  * Bucket assembly needs a plain object per item (persisted as jsonb), not a
  * SQL row shape — this doubles as the conversion to DeckItem for the API
- * response.
+ * response. `genreNames` resolves `row.genre_ids` (already returned by the
+ * `get_eligible_media` RPC, no extra join needed) to display names so the
+ * result bakes genres straight into the persisted bucket instead of
+ * re-querying `media_genres` per read (unlike v1's attachGenreNames, which
+ * only has ids to work with after the fact).
  */
-function rowToDeckItem(row: EligibleRow): DeckItem {
+function rowToDeckItem(row: EligibleRow, genreNames: Map<number, string>): DeckItem {
   return {
     id: row.id,
     format: row.format as MediaFormat,
@@ -61,9 +65,18 @@ function rowToDeckItem(row: EligibleRow): DeckItem {
     backdropPath: row.backdrop_path,
     runtime: row.runtime,
     displayType: getDisplayType(row.format as MediaFormat, row.classification as Classification),
+    genres: row.genre_ids.map((id) => genreNames.get(id)).filter((n): n is string => Boolean(n)),
     userRejectCount: 0,
     userHiddenUntil: null,
   };
+}
+
+/** `genres` is a small, near-static TMDB reference table — one unfiltered
+ * fetch per bucket build is cheap and avoids an N+1 join against
+ * `media_genres` for every candidate row. */
+async function getGenreNameMap(supabase: SupabaseClient): Promise<Map<number, string>> {
+  const { data } = await supabase.from('genres').select('id, name');
+  return new Map((data ?? []).map((g: { id: number; name: string }) => [g.id, g.name]));
 }
 
 // --- filter hashing (spec 23 §7) ---
@@ -210,7 +223,7 @@ export async function buildBucket(
   filters: ParsedDeckFilters,
 ): Promise<Bucket> {
   const filterHash = computeFilterHash(filters);
-  const taste = await getTaste(supabase, userId);
+  const [taste, genreNameMap] = await Promise.all([getTaste(supabase, userId), getGenreNameMap(supabase)]);
   const quotas = deriveQuotas(taste);
 
   const genreIds = resolveGenreIds(filters.genreNames);
@@ -335,7 +348,7 @@ export async function buildBucket(
     }
   }
 
-  const items = shuffle([...chosen.values()]).map(rowToDeckItem);
+  const items = shuffle([...chosen.values()]).map((row) => rowToDeckItem(row, genreNameMap));
   const partial = items.length < BUCKET_SIZE;
   const reason: Bucket['reason'] = !partial
     ? undefined

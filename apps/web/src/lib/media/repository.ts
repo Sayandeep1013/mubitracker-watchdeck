@@ -51,7 +51,45 @@ export function toMediaSummary(row: DbMedia): MediaSummary {
       row.format as MediaSummary['format'],
       row.classification as MediaSummary['classification'],
     ),
+    // Empty until a caller opts in via attachGenreNames() below — most
+    // routes don't need genre names, so this isn't fetched by default.
+    genres: [],
   };
+}
+
+/**
+ * Batch-attaches genre names onto already-built MediaSummary/DeckItem
+ * objects, via one extra `media_genres` query (not a join on the primary
+ * `media` select, so every existing call site keeps working unchanged).
+ * `genres` table holds TMDB's own authoritative genre id/name pairs
+ * (seeded by the corpus ingestion script), which is what `media_genres`
+ * links reference — deliberately NOT the same as shared/constants/genres.ts'
+ * GENRE_MAP (that's a movie-only, hand-picked subset used only for
+ * building TMDB discover query params, not a source of truth for display).
+ */
+export async function attachGenreNames<T extends MediaSummary>(
+  supabase: SupabaseClient,
+  items: T[],
+): Promise<T[]> {
+  if (items.length === 0) return items;
+  const ids = items.map((item) => item.id);
+  const { data, error } = await supabase
+    .from('media_genres')
+    .select('media_id, genres(name)')
+    .in('media_id', ids);
+  if (error || !data) return items;
+
+  const byMedia = new Map<string, string[]>();
+  for (const row of data as { media_id: string; genres: { name: string } | { name: string }[] | null }[]) {
+    const genreRow = row.genres;
+    const name = Array.isArray(genreRow) ? genreRow[0]?.name : genreRow?.name;
+    if (!name) continue;
+    const list = byMedia.get(row.media_id) ?? [];
+    list.push(name);
+    byMedia.set(row.media_id, list);
+  }
+
+  return items.map((item) => ({ ...item, genres: byMedia.get(item.id) ?? [] }));
 }
 
 /**

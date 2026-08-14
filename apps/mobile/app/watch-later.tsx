@@ -7,7 +7,7 @@ import { apiClient } from '@/lib/api';
 import { useFocusFetch } from '@/lib/useFocusFetch';
 import { ScreenState } from '@/components/ScreenState';
 import { useToast } from '@/components/Toast';
-import { color, radius, space, type } from '@/lib/theme';
+import { color, glassCard, radius, space, type } from '@/lib/theme';
 
 interface WatchLaterItem {
   id: string;
@@ -39,15 +39,15 @@ export default function WatchLaterScreen() {
     }
   };
 
-  const state = (
-    <ScreenState
-      loading={loading && items.length === 0}
-      error={error}
-      empty={!loading && !error && items.length === 0}
-      emptyText="Nothing saved yet — on the deck, swipe up for Watch Later."
-      onRetry={reload}
-    />
-  );
+  // Bug, confirmed live (same root cause fixed elsewhere this session):
+  // `state ?? (<FlatList/>)` never falls through, because `state` holds a
+  // created JSX element — always a truthy, non-null object — regardless
+  // of what ScreenState renders once mounted. `??` only falls through on
+  // null/undefined, so the FlatList was dead code; this screen could
+  // never show anything but ScreenState's own loading/error/empty output
+  // (or blank, when none of those applied). This IS "Watch Later isn't
+  // loading" — not a network/fetch problem, just this render bug.
+  const showState = !!error || items.length === 0;
 
   return (
     <SafeAreaView style={styles.flex} edges={['top', 'bottom']}>
@@ -64,7 +64,15 @@ export default function WatchLaterScreen() {
         </Pressable>
       </View>
 
-      {state ?? (
+      {showState ? (
+        <ScreenState
+          loading={loading && items.length === 0}
+          error={error}
+          empty={!loading && !error && items.length === 0}
+          emptyText="Nothing saved yet — on the deck, swipe up for Watch Later."
+          onRetry={reload}
+        />
+      ) : (
         <FlatList
           data={items}
           keyExtractor={(item) => item.id}
@@ -75,7 +83,7 @@ export default function WatchLaterScreen() {
             const poster = tmdbPosterUrl(item.posterPath, 'card');
             const busy = markingId === item.id;
             return (
-              <View style={styles.row}>
+              <View style={[styles.row, glassCard()]}>
                 {poster ? (
                   <Image source={{ uri: poster }} style={styles.poster} />
                 ) : (
@@ -126,8 +134,6 @@ const styles = StyleSheet.create({
     gap: space.md,
     marginBottom: space.md,
     padding: space.sm,
-    backgroundColor: color.surface,
-    borderRadius: radius.sm,
   },
   poster: { width: 56, height: 84, borderRadius: radius.sm / 2 },
   posterPlaceholder: { backgroundColor: color.surfaceHigh },

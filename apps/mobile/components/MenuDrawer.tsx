@@ -6,7 +6,7 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from '
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMenu } from '@/lib/menu';
 import { useNotifications } from '@/lib/notifications';
-import { color, radius, space, type } from '@/lib/theme';
+import { color, space, type } from '@/lib/theme';
 
 type FeatherName = keyof typeof Feather.glyphMap;
 
@@ -92,7 +92,7 @@ export function MenuDrawer() {
               accessibilityLabel={item.label}
             >
               <View style={styles.iconBadge}>
-                <Feather name={item.icon} size={18} color={color.primary} />
+                <Feather name={item.icon} size={15} color={color.primary} />
               </View>
               <Text style={styles.rowText}>{item.label}</Text>
               {!!item.badge && (
@@ -127,30 +127,34 @@ const styles = StyleSheet.create({
   },
   drawerContent: { flex: 1, paddingHorizontal: space.lg },
   title: { color: color.text, ...type.headline, marginBottom: space.lg },
-  // Same surface + red-left-border language as Profile's own cards/
-  // segmented control, applied uniformly (not a different hue per row).
+  // A muted version of the "Undo button" glass look — confirmed live the
+  // full-opacity red border + 56dp rows read as "too bright and big" for
+  // four rows stacked in a list (the Undo pill is a single small one-off
+  // accent, not meant to tile). Lower alpha border, smaller fill, more
+  // compact sizing; still recognizably the same red-glass language.
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.md,
-    minHeight: 56,
-    borderRadius: radius.md,
-    borderLeftWidth: 3,
-    borderLeftColor: color.primary,
-    paddingHorizontal: space.md,
-    backgroundColor: color.surface,
-    marginBottom: space.sm,
+    gap: space.sm,
+    minHeight: 44,
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
+    marginBottom: space.xs,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: `${color.primary}40`,
+    backgroundColor: `${color.primary}0F`,
   },
   iconBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(239,68,68,0.15)',
+    backgroundColor: 'rgba(239,68,68,0.12)',
   },
   pressed: { opacity: 0.7 },
-  rowText: { color: color.text, fontSize: type.body.fontSize, fontWeight: '600', flex: 1 },
+  rowText: { color: color.text, fontSize: type.label.fontSize, fontWeight: '600', flex: 1 },
   badge: {
     minWidth: 20,
     height: 20,

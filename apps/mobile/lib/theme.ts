@@ -64,6 +64,38 @@ export const motion = {
   ENTER_SPRING: { damping: 22, stiffness: 160, mass: 0.7 },
 } as const;
 
+/** The "Undo button" look (confirmed live, user's favorite treatment this
+ * session): a translucent tint fill + solid-color border + full pill
+ * radius — a "glass" chip rather than a flat filled button. This is the
+ * app-wide visual theme (spec: user request "make this the theme of the
+ * whole app") — reach for `glassChip(tint)` anywhere a pill/button/tag
+ * would otherwise get a flat `surface`/`surfaceHigh` fill. Defaults to
+ * `color.primary` (red) to match the original Undo button exactly; pass a
+ * different tint (e.g. `color.success`) for action-specific chips. */
+export function glassChip(tint: string = color.primary) {
+  return {
+    backgroundColor: `${tint}1F`, // ~12% alpha, matches rgba(239,68,68,0.12)
+    borderWidth: 1,
+    borderColor: tint,
+    borderRadius: radius.pill,
+  } as const;
+}
+
+/** Same recipe as `glassChip` but for rectangular containers (list rows,
+ * grid cards, drawer items) instead of pill buttons — a lower-key tint by
+ * default (`color.border`, not `color.primary`) since a full-red border on
+ * every single card/row app-wide reads as noisy rather than themed; pass
+ * `color.primary` explicitly where a card should carry the accent (e.g. a
+ * selected/active state). */
+export function glassCard(tint: string = color.border, cornerRadius: number = radius.md) {
+  return {
+    backgroundColor: `${tint}1F`,
+    borderWidth: 1,
+    borderColor: tint,
+    borderRadius: cornerRadius,
+  } as const;
+}
+
 export const elevation = {
   card: {
     shadowColor: '#000',

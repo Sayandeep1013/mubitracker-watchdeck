@@ -8,7 +8,7 @@ import { useFocusFetch } from '@/lib/useFocusFetch';
 import { useNotifications } from '@/lib/notifications';
 import { ScreenState } from '@/components/ScreenState';
 import { useToast } from '@/components/Toast';
-import { color, radius, space, type } from '@/lib/theme';
+import { color, glassCard, glassChip, radius, space, type } from '@/lib/theme';
 
 type Tab = 'friends' | 'incoming' | 'outgoing' | 'blocked';
 
@@ -143,15 +143,12 @@ export default function FriendsScreen() {
           ? 'No outgoing requests'
           : 'No blocked users';
 
-  const state = (
-    <ScreenState
-      loading={loading && !data}
-      error={error}
-      empty={!loading && !error && rows.length === 0}
-      emptyText={emptyText}
-      onRetry={reload}
-    />
-  );
+  // Bug, confirmed live (same root cause fixed elsewhere this session):
+  // `state ?? (<FlatList/>)` never falls through since `state` holds a
+  // created JSX element — always truthy/non-null — regardless of what
+  // ScreenState renders once mounted. Mirrors the same three conditions
+  // ScreenState itself branches on.
+  const showState = (loading && !data) || !!error || (!loading && !error && rows.length === 0);
 
   return (
     <View style={styles.container}>
@@ -168,11 +165,11 @@ export default function FriendsScreen() {
       )}
 
       {showNudge && (
-        <View style={styles.nudge}>
+        <View style={[styles.nudge, glassCard()]}>
           <Text style={styles.nudgeText}>Let people find you by username?</Text>
           <View style={styles.nudgeActions}>
             <Pressable
-              style={({ pressed }) => [styles.nudgeBtn, styles.nudgePrimary, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.nudgeBtn, glassChip(), pressed && styles.pressed]}
               onPress={makeDiscoverable}
               accessibilityRole="button"
               accessibilityLabel="Make me discoverable"
@@ -217,7 +214,15 @@ export default function FriendsScreen() {
         ))}
       </View>
 
-      {state ?? (
+      {showState ? (
+        <ScreenState
+          loading={loading && !data}
+          error={error}
+          empty={!loading && !error && rows.length === 0}
+          emptyText={emptyText}
+          onRetry={reload}
+        />
+      ) : (
         <FlatList
           data={rows}
           keyExtractor={(item) => item.id}
@@ -229,7 +234,7 @@ export default function FriendsScreen() {
             const isBusy = busyId === item.id;
             return (
               <Pressable
-                style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+                style={({ pressed }) => [styles.row, glassCard(), pressed && styles.pressed]}
                 onPress={() =>
                   item.friend &&
                   router.push(
@@ -331,18 +336,13 @@ const styles = StyleSheet.create({
   handleText: { color: color.text, fontWeight: '600' },
   handleAction: { color: color.textMuted, fontSize: type.caption.fontSize },
   nudge: {
-    backgroundColor: color.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: color.border,
     padding: space.lg,
     marginBottom: space.lg,
   },
   nudgeText: { color: color.text, marginBottom: space.md },
   nudgeActions: { flexDirection: 'row', gap: space.md },
   nudgeBtn: { minHeight: 44, justifyContent: 'center', paddingHorizontal: space.lg, borderRadius: radius.sm },
-  nudgePrimary: { backgroundColor: color.primary },
-  nudgePrimaryText: { color: color.onPrimary, fontWeight: '600', fontSize: type.caption.fontSize },
+  nudgePrimaryText: { color: color.primary, fontWeight: '700', fontSize: type.caption.fontSize },
   nudgeSecondaryText: { color: color.textMuted, fontWeight: '600', fontSize: type.caption.fontSize },
   segmented: {
     flexDirection: 'row',
@@ -352,15 +352,13 @@ const styles = StyleSheet.create({
     marginBottom: space.lg,
   },
   segment: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm },
-  segmentActive: { backgroundColor: color.primary },
+  segmentActive: { backgroundColor: `${color.primary}1F`, borderWidth: 1, borderColor: color.primary },
   segmentText: { color: color.textMuted, fontSize: 12, fontWeight: '600' },
-  segmentTextActive: { color: color.onPrimary },
+  segmentTextActive: { color: color.primary },
   list: { paddingBottom: space.xl },
   row: {
     minHeight: 48,
     padding: space.lg,
-    backgroundColor: color.surface,
-    borderRadius: radius.sm,
     marginBottom: space.sm,
     flexDirection: 'row',
     alignItems: 'center',

@@ -14,7 +14,7 @@ import {
 import { apiClient } from '@/lib/api';
 import { useFilters } from '@/lib/filters';
 import { useToast } from '@/components/Toast';
-import { color, radius, space, type } from '@/lib/theme';
+import { color, glassChip, radius, space, type } from '@/lib/theme';
 
 const GENRE_NAMES = Object.keys(GENRE_MAP);
 const LANGUAGES = ['en', 'ja', 'ko', 'hi', 'bn', 'de', 'fr', 'es'];
@@ -225,7 +225,7 @@ export default function FiltersScreen() {
             <Pressable
               onPress={savePreset}
               disabled={!presetName.trim() || saving}
-              style={({ pressed }) => [styles.saveBtn, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.saveBtn, glassChip(), pressed && styles.pressed]}
               accessibilityRole="button"
               accessibilityLabel="Save preset"
             >
@@ -268,7 +268,7 @@ export default function FiltersScreen() {
         </Pressable>
         <Pressable
           onPress={apply}
-          style={({ pressed }) => [styles.footerBtn, styles.applyBtn, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.footerBtn, styles.applyBtn, glassChip(), pressed && styles.pressed]}
           accessibilityRole="button"
           accessibilityLabel="Apply filters"
         >
@@ -302,7 +302,7 @@ function Chip({
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.chip, selected && styles.chipSelected, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.chip, selected && glassChip(), pressed && styles.pressed]}
       accessibilityRole="button"
       accessibilityState={{ selected }}
       accessibilityLabel={label}
@@ -344,7 +344,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: color.border,
   },
-  chipSelected: { borderColor: color.primary, backgroundColor: `${color.primary}26` },
   chipText: { color: color.textMuted, fontSize: 12 },
   chipTextSelected: { color: color.primary },
   capitalize: { textTransform: 'capitalize' },
@@ -359,14 +358,12 @@ const styles = StyleSheet.create({
     minHeight: 44,
   },
   saveBtn: {
-    backgroundColor: color.surfaceHigh,
-    borderRadius: radius.sm,
     paddingHorizontal: space.lg,
     minHeight: 44,
     justifyContent: 'center',
   },
   pressed: { opacity: 0.6 },
-  saveBtnText: { color: color.text, fontWeight: '600' },
+  saveBtnText: { color: color.primary, fontWeight: '700' },
   presetPillRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, marginBottom: space.sm },
   presetPill: {
     minHeight: 36,
@@ -396,6 +393,6 @@ const styles = StyleSheet.create({
     borderColor: color.border,
   },
   footerBtnText: { color: color.textMuted, fontWeight: '600' },
-  applyBtn: { backgroundColor: color.primary, borderColor: color.primary },
-  applyBtnText: { color: color.onPrimary, fontWeight: '600' },
+  applyBtn: {},
+  applyBtnText: { color: color.primary, fontWeight: '700' },
 });

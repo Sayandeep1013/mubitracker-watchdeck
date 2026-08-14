@@ -4,7 +4,7 @@ import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-na
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiClient } from '@/lib/api';
 import { useToast } from '@/components/Toast';
-import { color, radius, space, type } from '@/lib/theme';
+import { color, glassCard, glassChip, radius, space, type } from '@/lib/theme';
 
 interface SearchHit {
   id: string;
@@ -94,6 +94,7 @@ export default function AddFriendScreen() {
             disabled={!username.trim() || sending}
             style={({ pressed }) => [
               styles.sendBtn,
+              glassChip(),
               (pressed || sending || !username.trim()) && styles.pressed,
             ]}
             accessibilityRole="button"
@@ -111,7 +112,7 @@ export default function AddFriendScreen() {
           placeholderTextColor={color.textMuted}
           autoCapitalize="none"
           autoCorrect={false}
-          style={styles.input}
+          style={styles.queryInput}
           accessibilityLabel="Search public profiles"
         />
 
@@ -120,7 +121,7 @@ export default function AddFriendScreen() {
           keyExtractor={(h) => h.id}
           style={styles.hitsList}
           renderItem={({ item }) => (
-            <View style={styles.hitRow}>
+            <View style={[styles.hitRow, glassCard()]}>
               <Text style={styles.hitText}>@{item.username}</Text>
               <Pressable
                 onPress={() => sendById(item)}
@@ -162,15 +163,25 @@ const styles = StyleSheet.create({
     color: color.text,
     minHeight: 48,
   },
-  sendBtn: {
-    backgroundColor: color.primary,
+  // Same look as `input`, minus `flex: 1` — that's only correct inside
+  // `row`, which shares the width with the Send button. Applied to this
+  // free-standing field (no row, direct child of a flex-column `body`) it
+  // grew to fill all remaining vertical space instead of just being one
+  // input's height — confirmed live, that's the "search way too big" bug.
+  queryInput: {
+    backgroundColor: color.surface,
     borderRadius: radius.sm,
+    padding: space.md,
+    color: color.text,
+    minHeight: 48,
+  },
+  sendBtn: {
     paddingHorizontal: space.xl,
     minHeight: 48,
     justifyContent: 'center',
   },
   pressed: { opacity: 0.6 },
-  sendBtnText: { color: color.onPrimary, fontWeight: '600' },
+  sendBtnText: { color: color.primary, fontWeight: '700' },
   hitsList: { marginTop: space.md },
   hitRow: {
     flexDirection: 'row',
@@ -178,8 +189,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     minHeight: 48,
     paddingVertical: space.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: color.border,
+    paddingHorizontal: space.md,
+    marginBottom: space.xs,
   },
   hitText: { color: color.text },
   addHit: { minHeight: 44, justifyContent: 'center' },

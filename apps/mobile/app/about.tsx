@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { color, radius, space, type } from '@/lib/theme';
+import { color, glassCard, space, type } from '@/lib/theme';
 
 const TMDB_URL = 'https://www.themoviedb.org/';
 
@@ -25,7 +25,7 @@ export default function AboutScreen() {
         with one decision per title.
       </Text>
 
-      <View style={styles.card}>
+      <View style={[styles.card, glassCard()]}>
         <Text style={styles.cardLabel}>Data Attribution</Text>
         <Text style={styles.body}>
           This product uses the TMDB API but is not endorsed or certified by TMDB.
@@ -52,8 +52,6 @@ const styles = StyleSheet.create({
   heading: { color: color.text, ...type.headline, marginBottom: space.md },
   body: { color: color.textMuted, marginBottom: space.md, lineHeight: 20 },
   card: {
-    backgroundColor: color.surface,
-    borderRadius: radius.lg,
     padding: space.lg,
   },
   cardLabel: {

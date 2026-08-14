@@ -6,7 +6,7 @@ import { apiClient } from '@/lib/api';
 import { useFocusFetch } from '@/lib/useFocusFetch';
 import { ScreenState } from '@/components/ScreenState';
 import { useToast } from '@/components/Toast';
-import { color, radius, space, type } from '@/lib/theme';
+import { color, glassChip, radius, space, type } from '@/lib/theme';
 
 export default function FriendDetailScreen() {
   const {
@@ -100,7 +100,7 @@ export default function FriendDetailScreen() {
       </View>
 
       <Pressable
-        style={({ pressed }) => [styles.btn, styles.primaryBtn, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.btn, glassChip(), pressed && styles.pressed]}
         onPress={compare}
         disabled={comparing}
         accessibilityRole="button"
@@ -110,7 +110,7 @@ export default function FriendDetailScreen() {
       </Pressable>
 
       <Pressable
-        style={({ pressed }) => [styles.btn, pressed && styles.pressed]}
+        style={({ pressed }) => [styles.btn, glassChip(color.textMuted), pressed && styles.pressed]}
         onPress={() => router.push(`/deck?friend_id=${id}&friend_mode=watched_not_me`)}
         accessibilityRole="button"
         accessibilityLabel="View their deck"
@@ -128,7 +128,7 @@ export default function FriendDetailScreen() {
 
       {friendshipId && (
         <Pressable
-          style={({ pressed }) => [styles.btn, styles.dangerBtn, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.btn, glassChip(color.danger), pressed && styles.pressed]}
           onPress={blocked ? unblock : block}
           disabled={blockBusy}
           accessibilityRole="button"
@@ -165,17 +165,13 @@ const styles = StyleSheet.create({
   btn: {
     minHeight: 48,
     justifyContent: 'center',
-    backgroundColor: color.surfaceHigh,
     padding: space.lg,
-    borderRadius: radius.sm,
     marginBottom: space.md,
   },
-  primaryBtn: { backgroundColor: color.primary },
-  dangerBtn: { borderWidth: 1, borderColor: color.danger, backgroundColor: 'transparent' },
   pressed: { opacity: 0.6 },
-  btnText: { color: color.text, textAlign: 'center', fontWeight: '600' },
-  primaryBtnText: { color: color.onPrimary, textAlign: 'center', fontWeight: '600' },
-  dangerBtnText: { color: color.danger, textAlign: 'center', fontWeight: '600' },
+  btnText: { color: color.textMuted, textAlign: 'center', fontWeight: '700' },
+  primaryBtnText: { color: color.primary, textAlign: 'center', fontWeight: '700' },
+  dangerBtnText: { color: color.danger, textAlign: 'center', fontWeight: '700' },
   compareCard: {
     backgroundColor: color.surface,
     borderRadius: radius.lg,

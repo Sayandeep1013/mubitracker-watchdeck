@@ -3,7 +3,7 @@ import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Dimensions, Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Image, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -21,7 +21,7 @@ import { apiClient } from '@/lib/api';
 import { enqueueOfflineAction, syncOfflineQueue } from '@/lib/offline-queue';
 import { useFilters } from '@/lib/filters';
 import { useToast } from '@/components/Toast';
-import { color, hitSlopFor, motion, radius, space, type } from '@/lib/theme';
+import { color, glassChip, hitSlopFor, motion, radius, space, type } from '@/lib/theme';
 
 type Action = 'unwatched' | 'watched' | 'watch_later' | 'review_later';
 type ExitDirection = 'left' | 'right' | 'up' | 'down';
@@ -44,6 +44,70 @@ const ACTION_META: Record<
   watch_later: { label: 'Watch Later', icon: 'clock', tint: color.warning, dir: 'up' },
   review_later: { label: 'Review Later', icon: 'bookmark', tint: color.review, dir: 'down' },
 };
+
+// A distinct physical "feel" per action instead of the old two-bucket split
+// (watched/unwatched both Medium, watch_later/review_later both Light) —
+// confirmed live that felt indistinguishable by touch alone. Undo and the
+// offline-save fallback stay on `notificationAsync` (a different haptic
+// class entirely), so none of these six overlap.
+//
+// On Android, `impactAsync`/`notificationAsync` are NOT the real haptic
+// engine — expo-haptics simulates them with the generic `Vibrator` API,
+// which on most Android hardware reads as a mushy, elastic "spring" rather
+// than a sharp click (confirmed live: "feels like spring, use some other
+// clicky haptic"). `performAndroidHapticsAsync` instead fires Android's own
+// `HapticFeedbackConstants` — the same primitives the OS keyboard/switches
+// use — which land as genuine short clicks. iOS's impact styles are native
+// (not simulated) and already felt right, so only Android branches here.
+function fireActionHaptic(action: Action) {
+  if (Platform.OS === 'android') {
+    switch (action) {
+      case 'watched':
+        Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Confirm);
+        break;
+      case 'unwatched':
+        Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Reject);
+        break;
+      case 'watch_later':
+        Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Toggle_On);
+        break;
+      case 'review_later':
+        Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Virtual_Key);
+        break;
+    }
+    return;
+  }
+  switch (action) {
+    case 'watched':
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      break;
+    case 'unwatched':
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid);
+      break;
+    case 'watch_later':
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      break;
+    case 'review_later':
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft);
+      break;
+  }
+}
+
+function fireUndoHaptic() {
+  if (Platform.OS === 'android') {
+    Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Context_Click);
+    return;
+  }
+  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+}
+
+function fireErrorHaptic() {
+  if (Platform.OS === 'android') {
+    Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Reject);
+    return;
+  }
+  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+}
 
 function hasFilterValues(filters: ReturnType<typeof useFilters>['filters']): boolean {
   return Object.values(filters).some((v) => (Array.isArray(v) ? v.length > 0 : v != null && v !== ''));
@@ -289,11 +353,7 @@ export default function DeckScreen() {
         },
       });
 
-      Haptics.impactAsync(
-        action === 'watched' || action === 'unwatched'
-          ? Haptics.ImpactFeedbackStyle.Medium
-          : Haptics.ImpactFeedbackStyle.Light,
-      );
+      fireActionHaptic(action);
 
       try {
         if (action === 'review_later') {
@@ -304,7 +364,7 @@ export default function DeckScreen() {
           await apiClient.updateUserMedia(current.id, { status: action, review_status: prevReview });
         }
       } catch {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        fireErrorHaptic();
         await enqueueOfflineAction({
           mediaId: current.id,
           status: action === 'review_later' ? 'watched' : action,
@@ -364,7 +424,7 @@ export default function DeckScreen() {
     if (!lastAction || undoing) return;
     const depth = undoStack.length;
     setUndoing(true);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    fireUndoHaptic();
     setIndex((i) => Math.max(0, i - 1));
     try {
       await apiClient.undo({
@@ -644,7 +704,22 @@ export default function DeckScreen() {
           </Text>
           <Text style={styles.meta}>
             {current.year ?? '—'} · {current.displayType}
+            {current.originalLanguage ? ` · ${current.originalLanguage.toUpperCase()}` : ''}
           </Text>
+          {current.genres?.length ? (
+            <View style={styles.genreRow}>
+              {current.genres.slice(0, 3).map((genre) => (
+                <View key={genre} style={[styles.genreChip, glassChip()]}>
+                  <Text style={styles.genreChipText}>{genre}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+          {current.overview ? (
+            <Text style={styles.premise} numberOfLines={3}>
+              {current.overview}
+            </Text>
+          ) : null}
           <Pressable
             onPress={openImdb}
             disabled={imdbLoading}
@@ -766,6 +841,24 @@ const styles = StyleSheet.create({
     marginTop: space.md,
   },
   meta: { color: color.textMuted, fontSize: type.body.fontSize, marginTop: space.xs, textAlign: 'center' },
+  genreRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: space.xs,
+    marginTop: space.sm,
+    paddingHorizontal: space.lg,
+  },
+  genreChip: { paddingVertical: 3, paddingHorizontal: 10 },
+  genreChipText: { color: color.primary, fontSize: type.caption.fontSize, fontWeight: '700' },
+  premise: {
+    color: color.textMuted,
+    fontSize: type.caption.fontSize,
+    lineHeight: 17,
+    textAlign: 'center',
+    marginTop: space.sm,
+    paddingHorizontal: space.xl,
+  },
   imdbHit: { minHeight: 32, alignItems: 'center', justifyContent: 'center', marginTop: space.xs },
   imdbLink: { color: color.textMuted, fontSize: type.caption.fontSize, fontWeight: '600' },
   muted: { color: color.textMuted },

@@ -1,5 +1,5 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { color, radius, space } from '@/lib/theme';
+import { color, glassChip, space } from '@/lib/theme';
 
 interface ScreenStateProps {
   loading?: boolean;
@@ -39,7 +39,7 @@ export function ScreenState({
             onPress={onRetry}
             accessibilityRole="button"
             accessibilityLabel="Retry"
-            style={({ pressed }) => [styles.retry, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.retry, glassChip(), pressed && styles.pressed]}
           >
             <Text style={styles.retryText}>Retry</Text>
           </Pressable>
@@ -67,11 +67,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
     justifyContent: 'center',
     paddingHorizontal: space.xl,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: color.border,
-    backgroundColor: color.surface,
   },
   pressed: { opacity: 0.6 },
-  retryText: { color: color.text, fontWeight: '600' },
+  retryText: { color: color.primary, fontWeight: '700' },
 });

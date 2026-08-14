@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -14,7 +15,7 @@ import type { MediaSummary, WatchStatus } from '@mubitracker/shared';
 import { tmdbPosterUrl } from '@mubitracker/shared';
 import { apiClient } from '@/lib/api';
 import { useToast } from '@/components/Toast';
-import { color, radius, space, type } from '@/lib/theme';
+import { color, glassCard, glassChip, radius, space, type } from '@/lib/theme';
 
 type MarkState = Record<string, WatchStatus | 'pending' | 'failed'>;
 
@@ -47,7 +48,13 @@ export default function SearchScreen() {
   const mark = async (id: string, status: WatchStatus, title: string) => {
     if (marks[id] === 'pending') return;
     setMarks((m) => ({ ...m, [id]: 'pending' }));
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Android's impactAsync is Vibrator-simulated (reads as springy, not a
+    // click) — see deck.tsx's fireActionHaptic for the full rationale.
+    if (Platform.OS === 'android') {
+      Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Virtual_Key);
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
     try {
       await apiClient.updateUserMedia(id, { status });
       setMarks((m) => ({ ...m, [id]: status }));
@@ -73,11 +80,11 @@ export default function SearchScreen() {
         <Pressable
           onPress={search}
           disabled={searching}
-          style={({ pressed }) => [styles.btn, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.btn, glassChip(), pressed && styles.pressed]}
           accessibilityRole="button"
           accessibilityLabel="Search"
         >
-          {searching ? <ActivityIndicator color={color.bg} /> : <Text style={styles.btnText}>Go</Text>}
+          {searching ? <ActivityIndicator color={color.primary} /> : <Text style={styles.btnText}>Go</Text>}
         </Pressable>
       </View>
 
@@ -96,7 +103,7 @@ export default function SearchScreen() {
           const poster = tmdbPosterUrl(item.posterPath, 'card');
           const mark_ = marks[item.id];
           return (
-            <View style={styles.item}>
+            <View style={[styles.item, glassCard()]}>
               {poster ? (
                 <Image source={{ uri: poster }} style={styles.thumb} />
               ) : (
@@ -164,14 +171,12 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: space.sm, marginBottom: space.lg },
   input: { flex: 1, backgroundColor: color.surface, borderRadius: radius.sm, padding: space.md, color: color.text },
   btn: {
-    backgroundColor: color.text,
-    borderRadius: radius.sm,
     paddingHorizontal: space.xl,
     minHeight: 48,
     justifyContent: 'center',
   },
   pressed: { opacity: 0.6 },
-  btnText: { color: color.bg, fontWeight: '600' },
+  btnText: { color: color.primary, fontWeight: '700' },
   error: { color: color.danger, marginBottom: space.md },
   muted: { color: color.textMuted, marginBottom: space.md },
   item: {
@@ -179,8 +184,6 @@ const styles = StyleSheet.create({
     gap: space.md,
     marginBottom: space.md,
     padding: space.sm,
-    backgroundColor: color.surface,
-    borderRadius: radius.sm,
   },
   thumb: { width: 48, height: 72, borderRadius: radius.sm / 2 },
   thumbPlaceholder: { backgroundColor: color.surfaceHigh },
