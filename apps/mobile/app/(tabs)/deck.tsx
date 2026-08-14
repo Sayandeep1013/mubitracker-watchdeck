@@ -54,13 +54,17 @@ function filterKeys(filters: ReturnType<typeof useFilters>['filters']): string[]
     .map(([k]) => k);
 }
 
-// The poster is the entire screen now (full-bleed, edge to edge) — the
-// Deck tab's header is transparent (see (tabs)/_layout.tsx) so there's no
-// separate solid bar pushing content down first. HEADER_ALLOWANCE is how
-// far our own overlays (the gesture hint, the Undo chip) need to sit below
-// the status bar before they clear the hamburger/Filters icons floating in
-// that transparent header band.
-const HEADER_ALLOWANCE = 64;
+// Reverted from a full-bleed poster back to a smaller framed card per
+// explicit feedback — deliberately smaller than the screen on both axes,
+// with visible "wiggle room" (background) around it on every side, and a
+// double border (an outer frame with a gap, then the poster's own border)
+// instead of the poster running edge to edge.
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const POSTER_WIDTH = Math.min(SCREEN_WIDTH * 0.62, 250);
+const POSTER_MAX_HEIGHT = Math.round(POSTER_WIDTH * 1.5);
+const FRAME_GAP = 5;
+const FRAME_BORDER = 1.5;
+const POSTER_BORDER = 2;
 
 export default function DeckScreen() {
   const insets = useSafeAreaInsets();
@@ -439,14 +443,14 @@ export default function DeckScreen() {
   if (!current) {
     if (!initialLoadDone) {
       return (
-        <View style={[styles.center, { paddingTop: insets.top + HEADER_ALLOWANCE }]} accessibilityLabel="Loading deck">
+        <View style={[styles.center, { paddingTop: insets.top }]} accessibilityLabel="Loading deck">
           <Text style={styles.muted}>Loading deck…</Text>
         </View>
       );
     }
     if (loadError) {
       return (
-        <View style={[styles.center, { paddingTop: insets.top + HEADER_ALLOWANCE }]}>
+        <View style={[styles.center, { paddingTop: insets.top }]}>
           <Text style={styles.errorText}>{loadError}</Text>
           <Pressable
             style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
@@ -464,7 +468,7 @@ export default function DeckScreen() {
       );
     }
     return (
-      <View style={[styles.center, { paddingTop: insets.top + HEADER_ALLOWANCE }]}>
+      <View style={[styles.center, { paddingTop: insets.top }]}>
         <Text style={styles.muted}>No titles match — try again later</Text>
       </View>
     );
@@ -478,105 +482,95 @@ export default function DeckScreen() {
   // mnemonic row.
   return (
     <View style={styles.container}>
+      <Text style={styles.hint}>← Haven&apos;t</Text>
+      <View style={styles.hintRow}>
+        <Text style={styles.hint}>↑ Watch Later</Text>
+        <Text style={styles.hint}>↓ Review Later</Text>
+      </View>
+      <Text style={styles.hint}>Watched →</Text>
+
       <GestureDetector gesture={pan}>
-        <Animated.View style={[styles.fullCard, cardStyle]}>
-          {poster ? (
-            <Image source={{ uri: poster }} style={styles.fullPoster} resizeMode="cover" />
-          ) : (
-            <View style={[styles.fullPoster, styles.posterPlaceholder]} />
-          )}
+        <Animated.View style={[styles.card, cardStyle]}>
+          {/* Double border: a thin outer frame with a visible gap, then the
+              poster's own (thicker, accent-colored) border — a picture-mat
+              look instead of the poster running edge to edge. */}
+          <View style={styles.frameOuter}>
+            <View style={styles.posterWrap}>
+              {poster ? (
+                <Image source={{ uri: poster }} style={styles.poster} resizeMode="cover" />
+              ) : (
+                <View style={[styles.poster, styles.posterPlaceholder]} />
+              )}
 
-          {/* Tinder-style verdict stamps for the two most common actions —
-              a rotated bordered badge in the corner the card is heading
-              toward, fading in with drag distance, instead of the old
-              full-poster color wash + giant centered icon. */}
-          <Animated.View
-            style={[
-              styles.stamp,
-              { top: insets.top + HEADER_ALLOWANCE + 80, left: space.lg, borderColor: color.success, transform: [{ rotate: '-12deg' }] },
-              rightCueStyle,
-            ]}
-            pointerEvents="none"
-          >
-            <Feather name="check" size={22} color={color.success} />
-            <Text style={[styles.stampText, { color: color.success }]}>WATCHED</Text>
-          </Animated.View>
-          <Animated.View
-            style={[
-              styles.stamp,
-              { top: insets.top + HEADER_ALLOWANCE + 80, right: space.lg, borderColor: color.danger, transform: [{ rotate: '12deg' }] },
-              leftCueStyle,
-            ]}
-            pointerEvents="none"
-          >
-            <Feather name="x" size={22} color={color.danger} />
-            <Text style={[styles.stampText, { color: color.danger }]}>HAVEN&apos;T</Text>
-          </Animated.View>
-          <Animated.View style={[styles.cue, styles.cueUp, upCueStyle]} pointerEvents="none">
-            <Feather name="clock" size={56} color={color.warning} />
-          </Animated.View>
-          <Animated.View style={[styles.cue, styles.cueDown, downCueStyle]} pointerEvents="none">
-            <Feather name="bookmark" size={56} color={color.review} />
-          </Animated.View>
+              {/* Tinder-style verdict stamps for the two most common
+                  actions — a rotated bordered badge in the corner the card
+                  is heading toward, fading in with drag distance. */}
+              <Animated.View
+                style={[
+                  styles.stamp,
+                  { top: space.sm, left: space.sm, borderColor: color.success, transform: [{ rotate: '-12deg' }] },
+                  rightCueStyle,
+                ]}
+                pointerEvents="none"
+              >
+                <Feather name="check" size={18} color={color.success} />
+                <Text style={[styles.stampText, { color: color.success }]}>WATCHED</Text>
+              </Animated.View>
+              <Animated.View
+                style={[
+                  styles.stamp,
+                  { top: space.sm, right: space.sm, borderColor: color.danger, transform: [{ rotate: '12deg' }] },
+                  leftCueStyle,
+                ]}
+                pointerEvents="none"
+              >
+                <Feather name="x" size={18} color={color.danger} />
+                <Text style={[styles.stampText, { color: color.danger }]}>HAVEN&apos;T</Text>
+              </Animated.View>
+              <Animated.View style={[styles.cue, styles.cueUp, upCueStyle]} pointerEvents="none">
+                <Feather name="clock" size={44} color={color.warning} />
+              </Animated.View>
+              <Animated.View style={[styles.cue, styles.cueDown, downCueStyle]} pointerEvents="none">
+                <Feather name="bookmark" size={44} color={color.review} />
+              </Animated.View>
 
-          {/* Gesture hint — the only instruction for a solely gesture-driven
-              screen, so it's deliberately more prominent than a normal
-              caption (bigger, bolder, brighter) instead of easy to miss. */}
-          <View style={[styles.hintWrap, { top: insets.top + HEADER_ALLOWANCE }]} pointerEvents="none">
-            <Text style={styles.hint}>← Haven&apos;t</Text>
-            <Text style={styles.hint}>↑ Watch Later</Text>
-            <Text style={styles.hint}>↓ Review Later</Text>
-            <Text style={styles.hint}>Watched →</Text>
+              {/* Undo used to be a full-width pill ABOVE the poster — read
+                  as a primary action when it's actually a rare, secondary
+                  utility. A small corner chip on the poster itself keeps it
+                  reachable without claiming its own row. */}
+              {undoStack.length > 0 && (
+                <Pressable
+                  onPress={handleUndo}
+                  disabled={undoing}
+                  hitSlop={hitSlopFor(28)}
+                  style={({ pressed }) => [styles.undoChip, pressed && styles.pressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Undo marking ${undoStack[0].title}`}
+                  accessibilityState={{ disabled: undoing }}
+                >
+                  <Feather name="rotate-ccw" size={12} color={color.text} />
+                  <Text style={styles.undoChipText}>{undoing ? 'Undoing…' : 'Undo'}</Text>
+                </Pressable>
+              )}
+            </View>
           </View>
 
-          {/* Undo used to be a full-width pill ABOVE the poster — read as a
-              primary action when it's actually a rare, secondary utility.
-              A small corner chip below the header icons keeps it reachable
-              without claiming its own row or competing with the poster. */}
-          {undoStack.length > 0 && (
-            <Pressable
-              onPress={handleUndo}
-              disabled={undoing}
-              hitSlop={hitSlopFor(32)}
-              style={({ pressed }) => [
-                styles.undoChip,
-                { top: insets.top + HEADER_ALLOWANCE + 40 },
-                pressed && styles.pressed,
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={`Undo marking ${undoStack[0].title}`}
-              accessibilityState={{ disabled: undoing }}
-            >
-              <Feather name="rotate-ccw" size={13} color={color.text} />
-              <Text style={styles.undoChipText}>{undoing ? 'Undoing…' : 'Undo'}</Text>
-            </Pressable>
-          )}
-
-          {/* Title/meta/IMDb sit directly on the poster — no background bar.
-              A solid/translucent panel behind them read as a separate UI
-              chrome element bolted onto the art (and its top edge cut the
-              poster with a hard line); a drop shadow on the text itself
-              keeps it legible over any poster without boxing it in, same
-              treatment as the gesture hint above and closer to how
-              Stremio/Letterboxd-style apps present a title over key art. */}
-          <View style={[styles.bottomInfo, { paddingBottom: insets.bottom + space.lg }]} pointerEvents="box-none">
-            <Text style={styles.title} numberOfLines={2}>
-              {current.title}
-            </Text>
-            <Text style={styles.meta}>
-              {current.year ?? '—'} · {current.displayType}
-            </Text>
-            <Pressable
-              onPress={openImdb}
-              disabled={imdbLoading}
-              hitSlop={12}
-              style={styles.imdbHit}
-              accessibilityRole="link"
-              accessibilityLabel={`Open ${current.title} on IMDb`}
-            >
-              <Text style={styles.imdbLink}>{imdbLoading ? 'Opening…' : 'IMDb ↗'}</Text>
-            </Pressable>
-          </View>
+          <Text style={styles.title} numberOfLines={2}>
+            {current.title}
+          </Text>
+          <Text style={styles.meta}>
+            {current.year ?? '—'} · {current.displayType}
+          </Text>
+          <Pressable
+            onPress={openImdb}
+            disabled={imdbLoading}
+            hitSlop={12}
+            style={styles.imdbHit}
+            accessibilityRole="link"
+            accessibilityLabel={`Open ${current.title} on IMDb`}
+          >
+            <Text style={styles.imdbLink}>{imdbLoading ? 'Opening…' : 'IMDb ↗'}</Text>
+          </Pressable>
         </Animated.View>
       </GestureDetector>
     </View>
@@ -584,41 +578,52 @@ export default function DeckScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: color.bg },
-  center: { flex: 1, backgroundColor: color.bg, alignItems: 'center', justifyContent: 'center', padding: space.xl },
-  fullCard: { ...StyleSheet.absoluteFillObject },
-  fullPoster: { ...StyleSheet.absoluteFillObject },
-  posterPlaceholder: { backgroundColor: color.surfaceHigh },
-  hintWrap: {
-    position: 'absolute',
-    left: space.lg,
-    right: space.lg,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  container: {
+    flex: 1,
+    backgroundColor: color.bg,
+    alignItems: 'center',
     justifyContent: 'center',
-    gap: space.sm,
+    paddingHorizontal: space.lg,
   },
-  hint: {
-    color: color.text,
-    fontSize: type.label.fontSize,
-    fontWeight: '700',
-    textShadowColor: 'rgba(0,0,0,0.85)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 6,
-  },
+  center: { flex: 1, backgroundColor: color.bg, alignItems: 'center', justifyContent: 'center', padding: space.xl },
+  posterPlaceholder: { backgroundColor: color.surfaceHigh },
+  hintRow: { flexDirection: 'row', gap: space.lg },
+  hint: { color: color.textMuted, fontSize: type.caption.fontSize, fontWeight: '700', marginVertical: 2 },
   pressed: { opacity: 0.7 },
+  card: { alignItems: 'center', width: '100%' },
+  // Double border: a thin outer frame (`frameOuter`) with a gap around a
+  // thicker, accent-colored inner border (`posterWrap`) — a picture-mat
+  // look, and the gap + outer frame are exactly the "wiggle room" that a
+  // plain single-border poster didn't have.
+  frameOuter: {
+    padding: FRAME_GAP,
+    borderWidth: FRAME_BORDER,
+    borderColor: color.border,
+    borderRadius: radius.lg,
+    backgroundColor: color.bg,
+  },
+  posterWrap: {
+    width: POSTER_WIDTH,
+    height: POSTER_MAX_HEIGHT,
+    borderWidth: POSTER_BORDER,
+    borderColor: color.primary,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+  },
+  poster: { width: '100%', height: '100%' },
   undoChip: {
     position: 'absolute',
-    right: space.md,
+    top: space.sm,
+    right: space.sm,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     backgroundColor: 'rgba(9,9,11,0.72)',
     borderRadius: radius.pill,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
   },
-  undoChipText: { color: color.text, fontSize: type.caption.fontSize, fontWeight: '600' },
+  undoChipText: { color: color.text, fontSize: 10, fontWeight: '600' },
   errorText: { color: color.danger, fontSize: type.body.fontSize, textAlign: 'center', marginBottom: space.lg },
   retryButton: {
     backgroundColor: color.surface,
@@ -638,51 +643,22 @@ const styles = StyleSheet.create({
     position: 'absolute',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    borderWidth: 3,
+    gap: 4,
+    borderWidth: 2.5,
     borderRadius: radius.sm,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
     backgroundColor: 'rgba(9,9,11,0.45)',
   },
-  stampText: { fontSize: type.label.fontSize, fontWeight: '800', letterSpacing: 0.5 },
-  // No background box — a drop shadow on the text itself is the only thing
-  // keeping it legible over the poster, same treatment as the gesture hint.
-  bottomInfo: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: space.xl,
-  },
+  stampText: { fontSize: type.caption.fontSize, fontWeight: '800', letterSpacing: 0.5 },
   title: {
-    color: '#fff',
-    fontSize: 30,
-    lineHeight: 36,
-    fontWeight: '800',
+    color: color.text,
+    ...type.title,
     textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.9)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 10,
+    marginTop: space.md,
   },
-  meta: {
-    color: '#e4e4e7',
-    fontSize: type.body.fontSize,
-    fontWeight: '600',
-    marginTop: space.xs,
-    textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.9)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 6,
-  },
+  meta: { color: color.textMuted, fontSize: type.body.fontSize, marginTop: space.xs, textAlign: 'center' },
   imdbHit: { minHeight: 32, alignItems: 'center', justifyContent: 'center', marginTop: space.xs },
-  imdbLink: {
-    color: '#e4e4e7',
-    fontSize: type.caption.fontSize,
-    fontWeight: '700',
-    textShadowColor: 'rgba(0,0,0,0.9)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 6,
-  },
+  imdbLink: { color: color.textMuted, fontSize: type.caption.fontSize, fontWeight: '600' },
   muted: { color: color.textMuted },
 });

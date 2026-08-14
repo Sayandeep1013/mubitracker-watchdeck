@@ -113,21 +113,9 @@ export default function TabLayout() {
         tabBarInactiveTintColor: themeColor.textMuted,
       }}
     >
-      {/* The poster is the whole page here — headerTransparent means the
-          header bar itself has no background, and the screen's own content
-          isn't pushed down to make room for it, so the poster renders full
-          height with the hamburger and Filters icons floating on top of it
-          at their usual spot instead of sitting on a separate solid bar
-          above it. */}
       <Tabs.Screen
         name="deck"
-        options={{
-          title: 'Deck',
-          headerTransparent: true,
-          headerTitle: '',
-          tabBarIcon: TabIcon('layers'),
-          headerRight: DeckHeaderRight,
-        }}
+        options={{ title: 'Deck', tabBarIcon: TabIcon('layers'), headerRight: DeckHeaderRight }}
       />
       <Tabs.Screen name="search" options={{ title: 'Search', tabBarIcon: TabIcon('search') }} />
       <Tabs.Screen
