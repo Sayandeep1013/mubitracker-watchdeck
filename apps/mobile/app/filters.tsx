@@ -91,12 +91,19 @@ export default function FiltersScreen() {
         router.back();
         if (onClosed) InteractionManager.runAfterInteractions(onClosed);
       };
+      // If the animation is interrupted rather than completed, the guard has
+      // to be released. Leaving it latched would make every later close a
+      // no-op — a sheet stuck open with no way out.
+      const release = () => {
+        dismissing.current = false;
+      };
       backdrop.value = withTiming(0, { duration: CLOSE_MS });
       translateY.value = withTiming(
         SHEET_TRAVEL,
         { duration: CLOSE_MS, easing: Easing.in(Easing.cubic) },
         (finished) => {
           if (finished) runOnJS(finish)();
+          else runOnJS(release)();
         },
       );
     },

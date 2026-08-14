@@ -26,25 +26,65 @@ type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export interface MubitrackerClientOptions {
   baseUrl: string;
   getAccessToken: () => Promise<string | null>;
+  /** Hard ceiling on a single request, in ms. See DEFAULT_TIMEOUT_MS. */
+  timeoutMs?: number;
 }
+
+/**
+ * React Native's fetch has no default timeout, so a request that stalls —
+ * flaky signal, a WiFi/cellular handover, the device sleeping mid-flight —
+ * never settles. Callers await forever: on mobile `useFocusFetch` leaves
+ * `loading` true with no error and no retry, which is a screen stuck on a
+ * spinner indefinitely. A request that cannot finish must fail rather than
+ * hang, so the UI can show an error and offer Retry.
+ */
+const DEFAULT_TIMEOUT_MS = 20_000;
+const TIMEOUT_MESSAGE = 'Request timed out — check your connection';
 
 export class MubitrackerClient {
   constructor(private options: MubitrackerClientOptions) {}
 
   private async fetch<T>(path: string, init?: RequestInit): Promise<T> {
-    const token = await this.options.getAccessToken();
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...(init?.headers as Record<string, string>),
-    };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
 
-    const res = await fetch(`${this.options.baseUrl}${path}`, { ...init, headers });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
-      throw new Error(err.error?.message ?? 'Request failed');
+    // `getAccessToken` is inside the deadline, not outside it: on mobile it
+    // calls into Supabase, which may itself go to the network to refresh an
+    // expired token. A hang there stalls the request before `fetch` is even
+    // reached, and an AbortSignal alone would never cover it.
+    const deadline = new Promise<never>((_, reject) => {
+      controller.signal.addEventListener('abort', () => reject(new Error(TIMEOUT_MESSAGE)));
+    });
+    // Whichever leg loses the race stays pending; without this it would
+    // surface as an unhandled rejection if the deadline fires later.
+    deadline.catch(() => {});
+
+    try {
+      const token = await Promise.race([this.options.getAccessToken(), deadline]);
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...(init?.headers as Record<string, string>),
+      };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`${this.options.baseUrl}${path}`, {
+        ...init,
+        headers,
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
+        throw new Error(err.error?.message ?? 'Request failed');
+      }
+      return (await res.json()) as T;
+    } catch (e) {
+      // An abort surfaces as a DOMException/AbortError, which reads as
+      // nothing useful in a toast — report why it actually failed.
+      if (controller.signal.aborted) throw new Error(TIMEOUT_MESSAGE);
+      throw e;
+    } finally {
+      clearTimeout(timer);
     }
-    return res.json() as Promise<T>;
   }
 
   search(q: string, limit = 20) {
