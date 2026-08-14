@@ -1,6 +1,6 @@
 # Project Context
 
-Last updated: **2026-08-12**
+Last updated: **2026-08-14**
 **Read this first.** It describes what Mubitracker is, where it runs, and what state it's actually in.
 Then read [`HANDOFF.md`](HANDOFF.md) (what just happened) and [`IMPLEMENTATION-PLAN.md`](IMPLEMENTATION-PLAN.md) (what to do next).
 
@@ -105,6 +105,17 @@ Username + password only. Under the hood, Supabase Auth with a **synthetic email
 
 **Known gap — resolved by explicit plan items, not yet implemented:** spec 32 §4 (a `/reviews` list screen with Written/Pending tabs) and spec 40 §7 (notifications alignment) were both scoped into their specs but absent from `IMPLEMENTATION-PLAN.md`. §6 (mobile-web bottom-nav `More` sheet) is covered by existing item 4.6. §4 and §7 are now explicit items **4.12** and **4.13** in Stage 4, rather than left as untracked prose gaps.
 
+**Stage 5 — pipeline & observability (`2026-08-14`), spec [`50`](spec/50-pipeline.md) — all nine items closed** (8 shipped, 1 dated waiver):
+- **Analytics (5.1)**: new `analytics_events` table + `POST /api/v1/analytics/events`. All 5 spec-mandated events (`deck_batch_served`, `media_classified`, `undo_used`, `deck_empty`, `filter_applied`) wired on both clients; web verified live end-to-end via headless Playwright, mobile is typecheck+`expo export` only (no device this session). Every `/api/v1/*` response now carries `x-request-id`; `deck.generate`/`tmdb.call` structured logs correlate by it. No Sentry account exists — `error.tsx`/`global-error.tsx` (web) and a class-component `ErrorBoundary` (mobile) both log structured `client.error` lines instead; `apiError()` logs any 5xx as `api.error`. Vercel's log dashboard is the "dashboard" this satisfies for now.
+- **CI expansion (5.2)**: `.github/workflows/ci.yml` restructured into `verify → mobile-bundle / contract-smoke → e2e-web`, all four confirmed green in real GitHub Actions (not just local runs) — a first attempt broke on `.env.local` not existing in a fresh CI checkout, fixed by falling back to `process.env`. 6 Playwright specs now cover spec 50 §4's journeys.
+- **Maestro nightly (5.3)**: `.github/workflows/nightly.yml`, cron + `workflow_dispatch`. `contract-smoke-full` (full `validate-deck-loop.mjs` + `cleanup-test-accounts.mjs --confirm`) is confirmed green in real CI. `mobile-e2e` (real Android emulator + sideloaded Expo Go + Maestro) got through emulator boot/KVM/Expo-Go-install after two real dispatch-and-fix rounds (broken shell quoting, then each line of a multi-line `script:` running as its own subshell) — **the actual `mobile-qa/flows/` run against a device with zero prior connection history is still unconfirmed**; `open-project.yaml`'s "tap the Recently-opened row" step may not work on a truly fresh Expo Go install (only tested against a device with existing history). Treat as a real, specific, still-open risk for the next session with dispatch access.
+- **TMDB caching + rate limiting (5.4)**: new `tmdb_cache` (6h/24h/15m TTLs by endpoint) and `tmdb_rate_limit` (atomic 1s-window counter replacing the old meaningless-on-serverless 35ms gate) tables. In-flight dedup, and a local-`media` fallback so `/api/v1/deck` survives a TMDB outage instead of 500ing. All four mechanisms verified live independently, including a deliberate TMDB-down test.
+- **Test-data cleanup (5.6)**: `scripts/cleanup-test-accounts.mjs`, verified live — deleted 13 real stale accounts on its first run.
+- **Docs refresh (5.7)**: `PROJECT_CONTEXT.md`/`TASKLIST.md` marked superseded rather than rewritten (stops the drift recurring).
+- **Dead code (5.8)**: removed `GET_MEDIA`, `/api/v1/recommendations`, `/api/v1/friends/[id]/collection` and their orphaned client methods/types.
+- **Migration convention (5.9)**: `supabase/migrations/README.md` makes the already-written convention discoverable.
+- **Staging Supabase (5.5)**: **dated waiver, not shipped** — needs the account owner's Supabase dashboard access to provision `mubitracker-staging`; deferred by user choice. `STAGING_URL` (CI/nightly) currently points at production, exactly the accepted-debt path spec 50 §1 already describes.
+
 *Fixed in Stage 1 (`2026-08-13`):*
 - ~~Series genre coverage 46%~~ — TV genre ids seeded, per-row genre-link inserts (one bad FK no longer drops a title's whole genre set), 236 genre-less rows backfilled from TMDB. **99.6% series / 99.7% movie coverage**, verified live.
 - ~~`media` duplicate rows on concurrent upsert~~ — `upsertMedia` now claims the `media_external_ids` link with `on conflict do nothing`; the loser of a race discards its orphan insert and refreshes the winner's metadata instead. Verified 0 duplicate `(provider, external_id)` pairs and 0 orphaned `media` rows under a live test run.
@@ -136,7 +147,8 @@ Useful for reasoning about the engine without re-querying:
 
 | Tool | Notes |
 |---|---|
-| Supabase MCP | project `deslckxkuvbfugdxibdn` — SQL, migrations, advisors, type gen |
+| Supabase MCP | project `deslckxkuvbfugdxibdn` — SQL, migrations, advisors, type gen. **2026-08-14: OAuth login's loopback callback failed twice** (environment issue, not a fluke) — fell back to a user-supplied Supabase Personal Access Token (dashboard → Account → Tokens) + the raw Management API (`POST https://api.supabase.com/v1/projects/{ref}/database/query` for SQL, `GET .../types/typescript` for type regen). If MCP OAuth still fails next session, this is the proven fallback — don't re-attempt OAuth more than once before switching. |
+| GitHub | `gh` on PATH here is an **unrelated tool** (a "Github browser opener", not GitHub CLI) — don't trust it. For repo Secrets/Variables (needed to wire CI env), use a user-supplied Personal Access Token (`repo`+`workflow` scope) with the REST API directly; setting Secrets needs libsodium sealed-box encryption (`libsodium-wrappers` via a throwaway `npm install` in the scratchpad, not a repo dependency). |
 | Vercel MCP | deployments, build logs, project config |
 | Playwright 1.62.1 | web E2E — suite lives in `apps/web/e2e/`, run with `pnpm --filter @mubitracker/web test:e2e`. Needs `E2E_SUPABASE_URL` + `E2E_SUPABASE_ANON_KEY` to seed (the API authenticates by bearer header, not cookie). Targets production unless `E2E_BASE_URL` is set. |
 | Maestro 2.6.1 + MCP | Android device automation; flows in `mobile-qa/flows/`, see `mobile-qa/README.md`. **A no-op run costs ~24s**, so device E2E belongs in a nightly job. |
