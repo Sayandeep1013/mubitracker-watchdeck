@@ -11,6 +11,7 @@ import { MenuDrawer } from '@/components/MenuDrawer';
 import { NotificationsProvider } from '@/lib/notifications';
 import { FiltersProvider } from '@/lib/filters';
 import { MenuProvider } from '@/lib/menu';
+import { AuthProvider } from '@/lib/auth';
 import { color } from '@/lib/theme';
 
 function useAuthGuard() {
@@ -61,19 +62,15 @@ function useAuthGuard() {
     };
   }, []);
 
+  // Secondary safety net, not the fix for the initial "/" cold-start case —
+  // `app/index.tsx`'s declarative <Redirect> owns that now (see its own
+  // comment for why an imperative router.replace() here wasn't enough).
+  // Still needed for auth transitions that happen mid-session: e.g. a token
+  // expiring while already deep in `/(tabs)/deck` flips `authed` false with
+  // `checked` still true, and nothing else would navigate away from that.
   useEffect(() => {
     if (!checked) return;
     const inLogin = segments[0] === 'login';
-    // There's no `app/index.tsx`, so a cold launch with no deep link (or an
-    // unrecognized/stale path) resolves to expo-router's built-in Unmatched
-    // Route screen, not any segment we own — confirmed live as the app
-    // getting stuck on "Unmatched Route" after a fresh install that still
-    // carried over a persisted session (`adb install -r` keeps app data).
-    // The old `authed && inLogin` check only ever rescued someone off the
-    // login screen, so an authed user landing anywhere else unrecognized
-    // (root, unmatched) was never sent home. Recognize every top-level
-    // segment this Stack actually declares, and treat anything outside
-    // that set as "needs to be routed home" instead of just "login".
     const inApp =
       segments[0] === '(tabs)' ||
       segments[0] === 'review' ||
@@ -86,11 +83,11 @@ function useAuthGuard() {
     }
   }, [checked, authed, segments, router]);
 
-  return checked;
+  return { checked, authed };
 }
 
 export default function RootLayout() {
-  const checked = useAuthGuard();
+  const { checked, authed } = useAuthGuard();
 
   return (
     <SafeAreaProvider>
@@ -99,6 +96,7 @@ export default function RootLayout() {
           <ToastProvider>
             <StatusBar style="light" />
             {checked ? (
+              <AuthProvider authed={authed}>
               <NotificationsProvider>
                 <FiltersProvider>
                   <MenuProvider>
@@ -140,6 +138,22 @@ export default function RootLayout() {
                           animation: 'slide_from_right',
                         }}
                       >
+                        {/* Gives "/" itself a real match. Without this file,
+                            a cold launch with no deep link resolved to
+                            expo-router's built-in Unmatched Route screen —
+                            confirmed live, twice: once masked by Expo Go's
+                            live-reload (which reuses navigator state across
+                            JS reloads, so it never hit a true cold start),
+                            then again on a real signed release APK, where it
+                            reproduced reliably. The previous fix (an
+                            imperative router.replace() in the effect below,
+                            keyed off `checked`/`authed`) raced the Stack
+                            navigator's own mount/hydration on a true cold
+                            native launch and lost — Expo Go's persistent
+                            state hid exactly that race. A file at "/" is not
+                            racing anything: it's what the navigator resolves
+                            to before any imperative call could run. */}
+                        <Stack.Screen name="index" options={{ animation: 'none' }} />
                         <Stack.Screen name="(tabs)" />
                         <Stack.Screen name="login" />
                         <Stack.Screen
@@ -179,6 +193,7 @@ export default function RootLayout() {
                   </MenuProvider>
                 </FiltersProvider>
               </NotificationsProvider>
+              </AuthProvider>
             ) : (
               <View style={styles.splash} accessibilityLabel="Loading Mubitracker">
                 <ActivityIndicator color={color.primary} size="large" />
