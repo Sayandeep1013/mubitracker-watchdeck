@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { InteractionManager, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   FILTER_TYPE_OPTIONS,
@@ -127,14 +127,20 @@ export default function FiltersScreen() {
     }
   };
 
+  // `setFilters` fires Deck's `[filters]` effect (queue reset + refetch)
+  // synchronously on the JS thread — done immediately before `router.back()`,
+  // that re-render was competing with the native dismiss animation for
+  // frames and made the close feel jarry. Firing `router.back()` first and
+  // deferring the state update past the transition (`runAfterInteractions`)
+  // keeps the dismiss animation on its own uncontested frames.
   const apply = () => {
-    setFilters(local);
     router.back();
+    InteractionManager.runAfterInteractions(() => setFilters(local));
   };
 
   const clear = () => {
-    setFilters({});
     router.back();
+    InteractionManager.runAfterInteractions(() => setFilters({}));
   };
 
   return (

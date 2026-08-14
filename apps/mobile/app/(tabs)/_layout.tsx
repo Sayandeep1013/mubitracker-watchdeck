@@ -149,6 +149,15 @@ export default function TabLayout() {
           // own — the one blur layer already underneath shows through.
           tabBarActiveTintColor: themeColor.text,
           tabBarInactiveTintColor: themeColor.textMuted,
+          // Bottom-tabs' `animation` defaults to 'none' — confirmed live as
+          // the jarry, instant cut both opening AND returning from a hidden
+          // tab (Review Later/Friends/Watch Later/About, all `href: null`
+          // here), unlike the Stack modals (Filters, review, friends/add)
+          // which animate natively in both directions. 'fade' is the only
+          // option that reads as smooth regardless of which two tabs are
+          // involved — 'shift' assumes adjacent, visually related screens,
+          // which doesn't hold for e.g. Deck <-> About.
+          animation: 'fade',
         };
       }}
     >
