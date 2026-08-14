@@ -24,18 +24,28 @@ requests, not backlog work. Don't invent a new stage; if you finish
 everything below, say so and ask what's next rather than picking your
 own direction.
 
-**First, before anything else — things that were left unverified when
-this handoff was written, because the connected Android device dropped
-its ADB connection mid-session and hadn't reconnected yet:**
-1. **The mobile deck screen's final state needs a fresh look.** The
-   bottom title/meta/IMDb overlay had its translucent background panel
-   removed in the very last edit of the session (replaced with a plain
-   text-shadow, no box) — this was NOT re-verified on a real screen
-   before the session ended. Screenshot it and check the title reads
-   cleanly against both a dark AND a light/white-dominant poster (no
-   background box means legibility depends entirely on the shadow now).
+**Update, later the same session:** the device's ADB connection came back
+(after several genuine drops — an incoming phone call, then the USB link
+itself flaking independently of anything in this repo; each drop also
+silently kills `adb reverse tcp:8081 tcp:8081`, which is *why* Expo Go
+then fails to reconnect with "Failed to download remote update" — re-run
+`adb reverse tcp:8081 tcp:8081` before assuming that error means anything
+about the app). Item 1 below **is now verified** — screenshotted the
+title over both a dark poster and a bright red/orange/yellow one
+("Armageddon"), legible on both, no changes needed. Item 2 is still open:
+the connection destabilized again (repeatedly `UNAVAILABLE` from Maestro,
+then dropped from `adb devices` entirely) before any of the 4 edited flow
+files could be run as actual files — only ad hoc Maestro commands were
+possible. If you hit the same instability, try `adb reverse tcp:8081
+tcp:8081` first; if `adb devices` shows nothing, it's a hardware/cable
+problem on the user's end, not a code or tooling issue — wait it out or
+ask the user to check the connection rather than debugging this repo.
+
+**Things that were unverified when this section was first written:**
+1. ~~The mobile deck screen's final state needs a fresh look~~ —
+   **verified**, see update above.
 2. **Four mobile-qa flow files were hand-edited to match the deck
-   redesign but never executed as files this session** —
+   redesign but still not executed as files** —
    `deck-gesture-map-and-buttons.yaml`, `undo-after-review-later.yaml`,
    `toast-and-keyboard.yaml`, `friends-ui.yaml`. The underlying
    mechanics (swipe classify, Undo chip, drawer nav) were checked via ad
