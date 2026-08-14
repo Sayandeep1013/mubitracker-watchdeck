@@ -66,7 +66,11 @@ function fireActionHaptic(action: Action) {
         Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Confirm);
         break;
       case 'unwatched':
-        Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Reject);
+        // AndroidHaptics.Reject is a compound double-buzz by OS design (it's
+        // meant to read as "no/error", not a plain click) — confirmed live
+        // as "double haptic" specifically on left-swipe/unwatched, the one
+        // action using it. Long_Press is a single firm pulse instead.
+        Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Long_Press);
         break;
       case 'watch_later':
         Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Toggle_On);
