@@ -52,9 +52,18 @@ export const motion = {
   CUE_THRESHOLD_Y: 55,
   ROTATION_FACTOR: 0.05,
   EXIT_DURATION: 220,
-  ENTER_DURATION: 200,
+  ENTER_DURATION: 260,
   EXIT_EASING: Easing.bezier(0.05, 0.7, 0.1, 1),
+  // A gentle, purely decelerating curve (no "punch in" at the start the
+  // way EXIT_EASING has) for the new card's opacity fade-in — confirmed
+  // live the old shared easing read as "snappy" here, not smooth.
+  ENTER_EASING: Easing.bezier(0.22, 1, 0.36, 1),
   SPRING: { damping: 18, stiffness: 220, mass: 0.6 },
+  // Softer than SPRING (lower stiffness, more damping relative to it) —
+  // SPRING is tuned for snap-back-on-cancelled-drag, which should stay
+  // snappy since it's direct manipulation follow-through; the new card's
+  // entrance wants to settle smoothly without any bounce.
+  ENTER_SPRING: { damping: 22, stiffness: 160, mass: 0.7 },
 } as const;
 
 export const elevation = {

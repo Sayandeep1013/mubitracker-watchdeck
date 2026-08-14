@@ -241,14 +241,19 @@ export default function DeckScreen() {
       dragOpacity.value = 1;
       enterOpacity.value = 0;
       enterScale.value = 0.94;
-      enterTranslateY.value = 12;
+      enterTranslateY.value = 14;
       setExitDirection(null);
       setIndex((i) => i + 1);
       busy.current = false;
       busyShared.value = false;
-      enterOpacity.value = withTiming(1, { duration: motion.ENTER_DURATION, easing: motion.EXIT_EASING });
-      enterScale.value = withTiming(1, { duration: motion.ENTER_DURATION, easing: motion.EXIT_EASING });
-      enterTranslateY.value = withTiming(0, { duration: motion.ENTER_DURATION, easing: motion.EXIT_EASING });
+      // Opacity fades in on a smooth deceleration curve; scale/position
+      // settle with a (non-bouncy) spring instead — springs read as more
+      // natural/smooth than a timing curve for this kind of "settle into
+      // place" motion, confirmed live the old shared-with-exit easing felt
+      // "snappy" here specifically.
+      enterOpacity.value = withTiming(1, { duration: motion.ENTER_DURATION, easing: motion.ENTER_EASING });
+      enterScale.value = withSpring(1, motion.ENTER_SPRING);
+      enterTranslateY.value = withSpring(0, motion.ENTER_SPRING);
     },
     [busyShared, dragOpacity, enterOpacity, enterScale, enterTranslateY, tx, ty],
   );

@@ -19,16 +19,23 @@ export default function ReviewLaterScreen() {
   const { data, loading, error, reload } = useFocusFetch<PendingItem[]>(fetcher);
   const items = data ?? [];
 
-  const state = (
-    <ScreenState
-      loading={loading && items.length === 0}
-      error={error}
-      empty={!loading && !error && items.length === 0}
-      emptyText="Nothing queued for review — swipe down on a title to add one."
-      onRetry={reload}
-    />
-  );
-  if (state) return <View style={styles.list}>{state}</View>;
+  // Bug, confirmed live (see collection.tsx / profile.tsx for the same
+  // fix): `if (state)` where state is a created JSX element is always
+  // truthy, hiding the real list every time there was real data to show.
+  const showState = !!error || items.length === 0;
+  if (showState) {
+    return (
+      <View style={styles.list}>
+        <ScreenState
+          loading={loading && items.length === 0}
+          error={error}
+          empty={!loading && !error && items.length === 0}
+          emptyText="Nothing queued for review — swipe down on a title to add one."
+          onRetry={reload}
+        />
+      </View>
+    );
+  }
 
   return (
     <FlatList

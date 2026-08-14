@@ -1,5 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { BlurView } from 'expo-blur';
 import { useEffect } from 'react';
 import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -73,35 +74,43 @@ export function MenuDrawer() {
       </Animated.View>
       <Animated.View
         pointerEvents={isOpen ? 'auto' : 'none'}
-        style={[styles.drawer, { width: DRAWER_WIDTH, paddingTop: insets.top + space.lg }, drawerStyle]}
+        style={[styles.drawer, { width: DRAWER_WIDTH }, drawerStyle]}
       >
-        <Text style={styles.title}>Menu</Text>
-        {items.map((item) => (
-          <Pressable
-            key={item.href}
-            onPress={() => {
-              close();
-              router.push(item.href);
-            }}
-            style={({ pressed }) => [
-              styles.row,
-              { borderLeftColor: item.tint },
-              pressed && styles.pressed,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={item.label}
-          >
-            <View style={[styles.iconBadge, { backgroundColor: `${item.tint}26` }]}>
-              <Feather name={item.icon} size={18} color={item.tint} />
-            </View>
-            <Text style={styles.rowText}>{item.label}</Text>
-            {!!item.badge && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{item.badge > 9 ? '9+' : item.badge}</Text>
+        {/* Frosted glass instead of a solid fill — blurs whatever's behind
+            the drawer (the current screen's own content, already dimmed by
+            the backdrop above), with a dark scrim on top so the menu stays
+            legible regardless of what that content is. */}
+        <BlurView intensity={70} tint="dark" style={StyleSheet.absoluteFill} />
+        <View style={styles.drawerScrim} />
+        <View style={[styles.drawerContent, { paddingTop: insets.top + space.lg }]}>
+          <Text style={styles.title}>Menu</Text>
+          {items.map((item) => (
+            <Pressable
+              key={item.href}
+              onPress={() => {
+                close();
+                router.push(item.href);
+              }}
+              style={({ pressed }) => [
+                styles.row,
+                { borderLeftColor: item.tint },
+                pressed && styles.pressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={item.label}
+            >
+              <View style={[styles.iconBadge, { backgroundColor: `${item.tint}26` }]}>
+                <Feather name={item.icon} size={18} color={item.tint} />
               </View>
-            )}
-          </Pressable>
-        ))}
+              <Text style={styles.rowText}>{item.label}</Text>
+              {!!item.badge && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{item.badge > 9 ? '9+' : item.badge}</Text>
+                </View>
+              )}
+            </Pressable>
+          ))}
+        </View>
       </Animated.View>
     </>
   );
@@ -112,18 +121,25 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
+  // No backgroundColor here — the BlurView + drawerScrim provide the
+  // actual fill now; this is just the frame (position/size/edge/shadow).
   drawer: {
     position: 'absolute',
     top: 0,
     left: 0,
     bottom: 0,
-    backgroundColor: color.bg,
+    overflow: 'hidden',
     borderRightWidth: 1,
-    borderRightColor: color.border,
-    paddingHorizontal: space.lg,
+    borderRightColor: 'rgba(255,255,255,0.14)',
     elevation: 16,
   },
+  drawerScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(9,9,11,0.45)' },
+  drawerContent: { flex: 1, paddingHorizontal: space.lg },
   title: { color: color.text, ...type.headline, marginBottom: space.lg },
+  // Rows stay a solid-ish surface (not further blurred) so the actual
+  // tappable targets keep firm contrast against the glass panel behind
+  // them — full translucency reads well for the panel itself, less so
+  // for text-bearing controls a person needs to read at a glance.
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -132,7 +148,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderLeftWidth: 3,
     paddingHorizontal: space.md,
-    backgroundColor: color.surface,
+    backgroundColor: 'rgba(39,39,42,0.72)',
     marginBottom: space.sm,
   },
   iconBadge: {

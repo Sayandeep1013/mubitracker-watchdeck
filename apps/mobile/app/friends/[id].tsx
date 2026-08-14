@@ -68,8 +68,16 @@ export default function FriendDetailScreen() {
     }
   };
 
-  const state = <ScreenState loading={loading && !data} error={error} onRetry={reload} />;
-  if (state) return <View style={styles.container}>{state}</View>;
+  // Bug, confirmed live (see collection.tsx / profile.tsx for the same
+  // fix): `if (state)` where state is a created JSX element is always
+  // truthy, hiding the real profile every time it actually loaded.
+  if ((loading && !data) || error) {
+    return (
+      <View style={styles.container}>
+        <ScreenState loading={loading && !data} error={error} onRetry={reload} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

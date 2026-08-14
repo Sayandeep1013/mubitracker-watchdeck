@@ -21,16 +21,29 @@ export default function CollectionScreen() {
   const { data, loading, error, reload } = useFocusFetch<CollectionItem[]>(fetcher);
   const items = data ?? [];
 
-  const state = (
-    <ScreenState
-      loading={loading && items.length === 0}
-      error={error}
-      empty={!loading && !error && items.length === 0}
-      emptyText="Nothing tracked yet — classify a few titles on the Deck."
-      onRetry={reload}
-    />
-  );
-  if (state) return <View style={styles.list}>{state}</View>;
+  // Bug, confirmed live: `const state = <ScreenState .../>; if (state)`
+  // checks whether a JSX element was CREATED, which is always truthy —
+  // it never reflects what ScreenState actually renders (null, per its
+  // own doc comment, whenever none of loading/error/empty apply). This
+  // branch was always taken, hiding the real FlatList every time there
+  // was real, non-empty data to show — only masked by testing against
+  // empty accounts, where ScreenState's `empty` case has something to
+  // show anyway. Mirrors the same three conditions ScreenState itself
+  // branches on, rather than the element-creation non-check above.
+  const showState = !!error || items.length === 0;
+  if (showState) {
+    return (
+      <View style={styles.list}>
+        <ScreenState
+          loading={loading && items.length === 0}
+          error={error}
+          empty={!loading && !error && items.length === 0}
+          emptyText="Nothing tracked yet — classify a few titles on the Deck."
+          onRetry={reload}
+        />
+      </View>
+    );
+  }
 
   return (
     <FlatList

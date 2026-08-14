@@ -76,8 +76,22 @@ export default function ProfileScreen() {
     }
   };
 
-  const state = <ScreenState loading={loading && !data} error={error} onRetry={reload} />;
-  if (state) return <View style={styles.container}>{state}</View>;
+  // Bug, confirmed live: `const state = <ScreenState .../>; if (state)`
+  // checks whether a JSX element was CREATED, which is always truthy
+  // (React.createElement always returns an object) — it never reflects
+  // what ScreenState actually renders. ScreenState returns null when
+  // there's nothing to say (see its own doc comment), so this branch was
+  // being taken unconditionally, hiding the real content below every
+  // single time data loaded successfully. Only masked by empty-account
+  // testing, where ScreenState's `empty` case legitimately has something
+  // to show — it broke the instant there was real data to display.
+  if ((loading && !data) || error) {
+    return (
+      <View style={styles.container}>
+        <ScreenState loading={loading && !data} error={error} onRetry={reload} />
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>

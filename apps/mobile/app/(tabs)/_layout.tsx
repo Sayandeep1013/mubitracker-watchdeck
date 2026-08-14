@@ -115,12 +115,30 @@ export default function TabLayout() {
         // a gradient for a hard edge to interrupt.
         const isDeck = route.name === 'deck';
         return {
-          headerStyle: { backgroundColor: themeColor.bg },
+          // Bug, confirmed live: `headerTransparent` alone did NOT stop a
+          // literal `headerStyle.backgroundColor` from still painting —
+          // the header looked "complete black", not blurred at all, even
+          // with headerTransparent: true, because this was set
+          // unconditionally for every route. Has to be transparent itself
+          // on Deck, not just omitted.
+          headerStyle: { backgroundColor: isDeck ? 'transparent' : themeColor.bg },
           headerTintColor: themeColor.text,
           headerLeft: HamburgerHeaderLeft,
           headerTransparent: isDeck,
+          // elevation/shadowOpacity/borderTopWidth all have to be zeroed
+          // explicitly — confirmed live that `borderTopColor: 'transparent'`
+          // alone still left a visible seam (Android's default elevation
+          // shadow draws regardless of border color, and a 0-color border
+          // that still has nonzero width can still catch light/AA oddly).
           tabBarStyle: isDeck
-            ? { position: 'absolute', backgroundColor: 'transparent', borderTopColor: 'transparent', elevation: 0 }
+            ? {
+                position: 'absolute',
+                backgroundColor: 'transparent',
+                borderTopWidth: 0,
+                borderTopColor: 'transparent',
+                elevation: 0,
+                shadowOpacity: 0,
+              }
             : { backgroundColor: themeColor.bg, borderTopColor: themeColor.border },
           tabBarBackground: isDeck
             ? () => <BlurView intensity={45} tint="dark" style={StyleSheet.absoluteFill} />
