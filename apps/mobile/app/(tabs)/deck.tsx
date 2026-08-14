@@ -16,9 +16,10 @@ import Animated, {
   Extrapolation,
 } from 'react-native-reanimated';
 import type { DeckItem, ReviewStatus, WatchStatus } from '@mubitracker/shared';
-import { MAX_UNDO_STACK, deckFiltersToSearchParams, tmdbPosterUrl } from '@mubitracker/shared';
+import { MAX_UNDO_STACK, NetworkUnavailableError, deckFiltersToSearchParams, tmdbPosterUrl } from '@mubitracker/shared';
 import { apiClient } from '@/lib/api';
 import { enqueueOfflineAction, syncOfflineQueue } from '@/lib/offline-queue';
+import { withNetworkRetry } from '@/lib/retry';
 import { useFilters } from '@/lib/filters';
 import { useToast } from '@/components/Toast';
 import { color, glassChip, hitSlopFor, motion, radius, space, type } from '@/lib/theme';
@@ -226,7 +227,21 @@ export default function DeckScreen() {
     const activeSessionId = overrides ? overrides.sessionId : sessionId;
     const fetchStart = Date.now();
     try {
-      await syncOfflineQueue();
+      const { failed: failedOfflineActions } = await syncOfflineQueue();
+      // These already came back as real (non-network) errors from the
+      // server — see syncOfflineQueue's own comment — so retrying them
+      // again would only fail the same way forever. This is the one place
+      // that ever finds out, so it's the one place that can tell the user
+      // instead of the action just quietly never having saved.
+      if (failedOfflineActions > 0) {
+        showToast({
+          message:
+            failedOfflineActions === 1
+              ? "1 change couldn't be saved and was discarded"
+              : `${failedOfflineActions} changes couldn't be saved and were discarded`,
+          tone: 'error',
+        });
+      }
       const params = deckFiltersToSearchParams(filters);
       if (friendId) {
         params.set('friend_id', friendId);
@@ -393,22 +408,49 @@ export default function DeckScreen() {
       fireActionHaptic(action);
 
       try {
-        if (action === 'review_later') {
-          await apiClient.reviewLater(current.id);
-        } else if (action === 'watch_later') {
-          await apiClient.watchLater(current.id);
-        } else {
-          await apiClient.updateUserMedia(current.id, { status: action, review_status: prevReview });
-        }
-      } catch {
-        fireErrorHaptic();
-        await enqueueOfflineAction({
-          mediaId: current.id,
-          status: action === 'review_later' ? 'watched' : action,
-          reviewStatus: action === 'review_later' ? 'pending' : 'none',
-          timestamp: new Date().toISOString(),
+        // Wrapped in a retry, not just a bare await: reproduced this exact
+        // write against production live (fresh signup -> immediate
+        // watch_later POST) and it succeeded first try — the pipeline
+        // itself has no bug. What real users hit instead is ordinary
+        // network flakiness (a WiFi handover, a moment of no signal), which
+        // is exactly the kind of failure that resolves itself within a few
+        // seconds. Retrying silently here means most of those blips never
+        // reach the user at all, instead of surfacing an error for
+        // something that would have worked a second later. Safe to retry
+        // because all three calls upsert on (user_id, media_id) — a retry
+        // after an ambiguous "did that even go through?" failure re-applies
+        // the same state rather than risking a duplicate.
+        await withNetworkRetry(() => {
+          if (action === 'review_later') return apiClient.reviewLater(current.id);
+          if (action === 'watch_later') return apiClient.watchLater(current.id);
+          return apiClient.updateUserMedia(current.id, { status: action, review_status: prevReview });
         });
-        showToast({ message: 'Saved offline — will sync when back online', tone: 'warning' });
+      } catch (e) {
+        fireErrorHaptic();
+        // Only a genuine connectivity failure belongs in the offline queue,
+        // and only once retries are already exhausted. Confirmed live as
+        // the actual root cause of "everything vanishes on watch later or
+        // watched after a refresh": this used to be a bare `catch {}` that
+        // treated EVERY failure — a real server rejection included — as
+        // "you're offline," silently queuing it and telling the user it was
+        // saved when it wasn't. The swipe already committed (the card is
+        // gone, this runs after the fact), so a real failure here can't be
+        // undone by re-showing the card — the honest thing is to say what
+        // actually happened instead of a false "saved" promise.
+        if (e instanceof NetworkUnavailableError) {
+          await enqueueOfflineAction({
+            mediaId: current.id,
+            status: action === 'review_later' ? 'watched' : action,
+            reviewStatus: action === 'review_later' ? 'pending' : 'none',
+            timestamp: new Date().toISOString(),
+          });
+          showToast({ message: 'Saved offline — will sync when back online', tone: 'warning' });
+        } else {
+          showToast({
+            message: e instanceof Error ? `Couldn't save — ${e.message}` : "Couldn't save — try again",
+            tone: 'error',
+          });
+        }
       }
     },
     [current, showToast],

@@ -41,6 +41,44 @@ export interface MubitrackerClientOptions {
 const DEFAULT_TIMEOUT_MS = 20_000;
 const TIMEOUT_MESSAGE = 'Request timed out — check your connection';
 
+/**
+ * The request never got a response at all: no connection, DNS failure, a
+ * dropped connection mid-flight, or our own deadline firing first. This is
+ * the ONLY failure mode that plausibly resolves itself once the device is
+ * back online — confirmed live as the actual bug behind "everything vanishes
+ * on watch later or watched after a refresh": mobile's callers were catching
+ * every error indiscriminately (this class included ApiHttpError below) and
+ * queuing it as "will sync later" with a reassuring toast. A brand-new
+ * account's `watched` writes WERE landing in the database — proving the
+ * pipeline itself worked — while `watch_later` writes silently vanished,
+ * which only makes sense if some of those failures were real (auth, a
+ * server error) and got misfiled as "offline" instead of shown to the user.
+ * Callers must check `instanceof NetworkUnavailableError` before treating
+ * anything as retryable-later; see mobile's offline-queue.ts and deck.tsx.
+ */
+export class NetworkUnavailableError extends Error {
+  constructor(message = 'No connection — check your network') {
+    super(message);
+    this.name = 'NetworkUnavailableError';
+  }
+}
+
+/**
+ * The server was reached and explicitly rejected the request (bad auth, a
+ * validation error, a 500, anything with a real HTTP status). Never a
+ * connectivity problem, so never a case for silently queuing and retrying —
+ * that would hide a real, possibly permanent failure behind a false "saved"
+ * message.
+ */
+export class ApiHttpError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiHttpError';
+    this.status = status;
+  }
+}
+
 export class MubitrackerClient {
   constructor(private options: MubitrackerClientOptions) {}
 
@@ -53,7 +91,7 @@ export class MubitrackerClient {
     // expired token. A hang there stalls the request before `fetch` is even
     // reached, and an AbortSignal alone would never cover it.
     const deadline = new Promise<never>((_, reject) => {
-      controller.signal.addEventListener('abort', () => reject(new Error(TIMEOUT_MESSAGE)));
+      controller.signal.addEventListener('abort', () => reject(new NetworkUnavailableError(TIMEOUT_MESSAGE)));
     });
     // Whichever leg loses the race stays pending; without this it would
     // surface as an unhandled rejection if the deadline fires later.
@@ -67,20 +105,34 @@ export class MubitrackerClient {
       };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const res = await fetch(`${this.options.baseUrl}${path}`, {
-        ...init,
-        headers,
-        signal: controller.signal,
-      });
+      let res: Response;
+      try {
+        res = await fetch(`${this.options.baseUrl}${path}`, {
+          ...init,
+          headers,
+          signal: controller.signal,
+        });
+      } catch (fetchErr) {
+        // Nothing came back at all: fetch's own connection failure, or our
+        // deadline aborting it. Either way the server was never reached —
+        // the one case that genuinely means "try again once online."
+        throw controller.signal.aborted
+          ? new NetworkUnavailableError(TIMEOUT_MESSAGE)
+          : new NetworkUnavailableError(
+              fetchErr instanceof Error ? fetchErr.message : 'Network request failed',
+            );
+      }
+
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
-        throw new Error(err.error?.message ?? 'Request failed');
+        throw new ApiHttpError(err.error?.message ?? 'Request failed', res.status);
       }
       return (await res.json()) as T;
     } catch (e) {
-      // An abort surfaces as a DOMException/AbortError, which reads as
-      // nothing useful in a toast — report why it actually failed.
-      if (controller.signal.aborted) throw new Error(TIMEOUT_MESSAGE);
+      if (e instanceof NetworkUnavailableError || e instanceof ApiHttpError) throw e;
+      // getAccessToken's leg of the deadline race lands here, not in the
+      // fetch()-specific catch above.
+      if (controller.signal.aborted) throw new NetworkUnavailableError(TIMEOUT_MESSAGE);
       throw e;
     } finally {
       clearTimeout(timer);
