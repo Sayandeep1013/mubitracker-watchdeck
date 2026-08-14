@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
   },
   nudgeText: { color: color.text, marginBottom: space.md },
   nudgeActions: { flexDirection: 'row', gap: space.md },
-  nudgeBtn: { minHeight: 44, justifyContent: 'center', paddingHorizontal: space.lg, borderRadius: radius.sm },
+  nudgeBtn: { minHeight: 44, justifyContent: 'center', paddingHorizontal: space.lg, borderRadius: radius.pill },
   nudgePrimaryText: { color: color.primary, fontWeight: '700', fontSize: type.caption.fontSize },
   nudgeSecondaryText: { color: color.textMuted, fontWeight: '600', fontSize: type.caption.fontSize },
   segmented: {

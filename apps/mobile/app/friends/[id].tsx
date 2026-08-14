@@ -6,7 +6,7 @@ import { apiClient } from '@/lib/api';
 import { useFocusFetch } from '@/lib/useFocusFetch';
 import { ScreenState } from '@/components/ScreenState';
 import { useToast } from '@/components/Toast';
-import { color, glassChip, radius, space, type } from '@/lib/theme';
+import { color, glassCard, glassChip, radius, space, type } from '@/lib/theme';
 
 export default function FriendDetailScreen() {
   const {
@@ -119,7 +119,7 @@ export default function FriendDetailScreen() {
       </Pressable>
 
       {comparison && (
-        <View style={styles.compareCard}>
+        <View style={[styles.compareCard, glassCard()]}>
           <Text style={styles.compareLine}>Both watched: {comparison.bothWatched}</Text>
           <Text style={styles.compareLine}>You only: {comparison.youOnly}</Text>
           <Text style={styles.compareLine}>Friend only: {comparison.friendOnly}</Text>
@@ -145,7 +145,7 @@ export default function FriendDetailScreen() {
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <View style={styles.stat}>
+    <View style={[styles.stat, glassCard()]}>
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
   closeHit: { minHeight: 44, justifyContent: 'center' },
   closeText: { color: color.textMuted, fontWeight: '600' },
   stats: { flexDirection: 'row', gap: space.md, marginBottom: space.xl },
-  stat: { flex: 1, padding: space.lg, backgroundColor: color.surface, borderRadius: radius.lg, alignItems: 'center' },
+  stat: { flex: 1, padding: space.lg, alignItems: 'center' },
   statValue: { color: color.text, fontSize: 22, fontWeight: '700' },
   statLabel: { color: color.textMuted, fontSize: type.caption.fontSize, marginTop: 2 },
   btn: {
@@ -173,8 +173,6 @@ const styles = StyleSheet.create({
   primaryBtnText: { color: color.primary, textAlign: 'center', fontWeight: '700' },
   dangerBtnText: { color: color.danger, textAlign: 'center', fontWeight: '700' },
   compareCard: {
-    backgroundColor: color.surface,
-    borderRadius: radius.lg,
     padding: space.lg,
     marginBottom: space.md,
   },

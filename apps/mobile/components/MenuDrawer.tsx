@@ -6,7 +6,7 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from '
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMenu } from '@/lib/menu';
 import { useNotifications } from '@/lib/notifications';
-import { color, space, type } from '@/lib/theme';
+import { color, radius, space, type } from '@/lib/theme';
 
 type FeatherName = keyof typeof Feather.glyphMap;
 
@@ -140,7 +140,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.sm,
     paddingVertical: space.xs,
     marginBottom: space.xs,
-    borderRadius: 10,
+    // Same corner radius as every other glass card/row in the app
+    // (glassCard()'s default radius.md) — confirmed live a one-off 10
+    // read as visibly different next to Collection/Friends/Review Later's
+    // rows right after switching screens.
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: `${color.primary}40`,
     backgroundColor: `${color.primary}0F`,

@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { useFocusFetch } from '@/lib/useFocusFetch';
 import { ScreenState } from '@/components/ScreenState';
 import { useToast } from '@/components/Toast';
-import { color, glassChip, radius, space, type } from '@/lib/theme';
+import { color, glassCard, glassChip, radius, space, type } from '@/lib/theme';
 
 type Visibility = 'public' | 'friends' | 'private';
 
@@ -107,7 +107,7 @@ export default function ProfileScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.privacyCard}>
+      <View style={[styles.privacyCard, glassCard()]}>
         <Text style={styles.privacyLabel}>Profile visibility</Text>
         <View style={styles.segmented}>
           <Pressable
@@ -190,7 +190,7 @@ export default function ProfileScreen() {
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <View style={styles.stat} accessibilityLabel={`${value} ${label}`}>
+    <View style={[styles.stat, glassCard()]} accessibilityLabel={`${value} ${label}`}>
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
@@ -214,8 +214,6 @@ const styles = StyleSheet.create({
   },
   copyBtnText: { color: color.primary, fontSize: type.caption.fontSize, fontWeight: '700' },
   privacyCard: {
-    backgroundColor: color.surface,
-    borderRadius: radius.lg,
     padding: space.lg,
     marginBottom: space.xl,
   },
@@ -243,8 +241,6 @@ const styles = StyleSheet.create({
   stat: {
     flex: 1,
     padding: space.lg,
-    backgroundColor: color.surface,
-    borderRadius: radius.lg,
     alignItems: 'center',
   },
   statValue: { color: color.text, fontSize: 22, fontWeight: '700' },

@@ -86,16 +86,39 @@ export default function RootLayout() {
                         last so it overlays everything (tab bar included) as a
                         sliding side panel instead of navigating to a full page. */}
                     <View style={styles.root}>
-                      <Stack screenOptions={{ headerShown: false }}>
+                      {/* `contentStyle` matters here: without it the native stack
+                          defaults each screen's container to white, which flashes
+                          for a frame during a modal's slide-up (or any push)
+                          before that screen's own dark View mounts and paints —
+                          confirmed live as "a white page shows up for a second"
+                          opening Filters. `animation: 'slide_from_bottom'` on the
+                          modal screens is what actually makes them read as a
+                          modal sliding up rather than a same-direction full page
+                          push, which is otherwise indistinguishable on Android. */}
+                      <Stack
+                        screenOptions={{ headerShown: false, contentStyle: { backgroundColor: color.bg } }}
+                      >
                         <Stack.Screen name="(tabs)" />
                         <Stack.Screen name="login" />
-                        <Stack.Screen name="review/[id]" options={{ presentation: 'modal' }} />
-                        <Stack.Screen name="friends/add" options={{ presentation: 'modal' }} />
-                        <Stack.Screen name="friends/notifications" options={{ presentation: 'modal' }} />
+                        <Stack.Screen
+                          name="review/[id]"
+                          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+                        />
+                        <Stack.Screen
+                          name="friends/add"
+                          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+                        />
+                        <Stack.Screen
+                          name="friends/notifications"
+                          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+                        />
                         <Stack.Screen name="friends/[id]" />
                         <Stack.Screen name="watch-later" />
                         <Stack.Screen name="about" />
-                        <Stack.Screen name="filters" options={{ presentation: 'modal' }} />
+                        <Stack.Screen
+                          name="filters"
+                          options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+                        />
                       </Stack>
                       <MenuDrawer />
                     </View>
