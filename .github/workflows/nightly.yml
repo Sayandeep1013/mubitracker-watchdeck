@@ -40,6 +40,11 @@ jobs:
   # and would go stale otherwise.
   mobile-e2e:
     runs-on: ubuntu-latest
+    # Backstop for a hung step slipping past its own internal timeout — a
+    # real dispatch (31765393373) hung silently for 45+ minutes with no
+    # log output until manually cancelled. 20 min comfortably covers a
+    # real run (emulator boot ~1min + Metro + 7 flows) with margin.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
