@@ -13,6 +13,22 @@ function TabIcon(name: FeatherName) {
   );
 }
 
+function HamburgerHeaderLeft() {
+  const router = useRouter();
+
+  return (
+    <Pressable
+      onPress={() => router.push('/menu')}
+      hitSlop={8}
+      style={styles.headerBtn}
+      accessibilityRole="button"
+      accessibilityLabel="Open menu"
+    >
+      <Feather name="menu" color={themeColor.text} size={22} />
+    </Pressable>
+  );
+}
+
 function DeckHeaderRight() {
   const router = useRouter();
   const { activeCount } = useFilters();
@@ -92,6 +108,7 @@ export default function TabLayout() {
       screenOptions={{
         headerStyle: { backgroundColor: themeColor.bg },
         headerTintColor: themeColor.text,
+        headerLeft: HamburgerHeaderLeft,
         tabBarStyle: { backgroundColor: themeColor.bg, borderTopColor: themeColor.border },
         tabBarActiveTintColor: themeColor.text,
         tabBarInactiveTintColor: themeColor.textMuted,
@@ -102,17 +119,23 @@ export default function TabLayout() {
         options={{ title: 'Deck', tabBarIcon: TabIcon('layers'), headerRight: DeckHeaderRight }}
       />
       <Tabs.Screen name="search" options={{ title: 'Search', tabBarIcon: TabIcon('search') }} />
+      {/* Collection/Review Later/Friends/Profile stay real routes (reachable
+          from the hamburger menu, and still deep-linkable) — `href: null`
+          just drops their button from the bottom tab bar, which was
+          crowded at 6 items. Deck and Search are the two the user actually
+          taps repeatedly; the rest are occasional. */}
       <Tabs.Screen
         name="collection"
         options={{
           title: 'Collection',
           tabBarIcon: TabIcon('grid'),
           headerRight: CollectionHeaderRight,
+          href: null,
         }}
       />
       <Tabs.Screen
         name="review-later"
-        options={{ title: 'Review Later', tabBarIcon: TabIcon('bookmark') }}
+        options={{ title: 'Review Later', tabBarIcon: TabIcon('bookmark'), href: null }}
       />
       <Tabs.Screen
         name="friends"
@@ -121,9 +144,13 @@ export default function TabLayout() {
           tabBarIcon: TabIcon('users'),
           tabBarBadge: unreadCount > 0 ? (unreadCount > 9 ? '9+' : unreadCount) : undefined,
           headerRight: FriendsHeaderRight,
+          href: null,
         }}
       />
-      <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: TabIcon('user') }} />
+      <Tabs.Screen
+        name="profile"
+        options={{ title: 'Profile', tabBarIcon: TabIcon('user'), href: null }}
+      />
     </Tabs>
   );
 }

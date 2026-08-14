@@ -36,12 +36,18 @@ interface LastAction {
 
 const ACTION_META: Record<
   Action,
-  { label: string; icon: keyof typeof Feather.glyphMap; tint: string; dir: ExitDirection }
+  {
+    label: string;
+    shortLabel: string;
+    icon: keyof typeof Feather.glyphMap;
+    tint: string;
+    dir: ExitDirection;
+  }
 > = {
-  unwatched: { label: "Haven't", icon: 'x', tint: color.danger, dir: 'left' },
-  watched: { label: 'Watched', icon: 'check', tint: color.success, dir: 'right' },
-  watch_later: { label: 'Watch Later', icon: 'clock', tint: color.warning, dir: 'up' },
-  review_later: { label: 'Review Later', icon: 'bookmark', tint: color.review, dir: 'down' },
+  unwatched: { label: "Haven't", shortLabel: "Haven't", icon: 'x', tint: color.danger, dir: 'left' },
+  watched: { label: 'Watched', shortLabel: 'Watched', icon: 'check', tint: color.success, dir: 'right' },
+  watch_later: { label: 'Watch Later', shortLabel: 'Later', icon: 'clock', tint: color.warning, dir: 'up' },
+  review_later: { label: 'Review Later', shortLabel: 'Review', icon: 'bookmark', tint: color.review, dir: 'down' },
 };
 
 function hasFilterValues(filters: ReturnType<typeof useFilters>['filters']): boolean {
@@ -53,6 +59,24 @@ function filterKeys(filters: ReturnType<typeof useFilters>['filters']): string[]
     .filter(([, v]) => (Array.isArray(v) ? v.length > 0 : v != null && v !== ''))
     .map(([k]) => k);
 }
+
+// Was a flat 220x330 (a strict 2:3 ratio) regardless of device size — small
+// on every screen and didn't scale up on bigger phones. Width now scales
+// with the actual screen so it isn't needlessly small on wider devices.
+//
+// Height is NOT a fixed multiple of that width — an earlier version used a
+// flat 1.72 ratio and it overlapped the action buttons on this exact device
+// (confirmed live via screenshot: "Detective Conan" / "1996 · Anime"
+// rendering on top of the Watched/Later buttons — there just wasn't enough
+// screen height left after the hint text, title, meta, and button row for a
+// poster that tall). Fixed instead with `flex: 1` on posterWrap below: the
+// poster fills whatever vertical space is actually left after its fixed-size
+// siblings, capped by POSTER_MAX_HEIGHT so it doesn't grow unbounded on a
+// very tall/short-content screen. Same principle as the web deck card's
+// dvh-based clamp, just expressed as RN flexbox instead of a CSS clamp().
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const POSTER_WIDTH = Math.min(SCREEN_WIDTH * 0.7, 300);
+const POSTER_MAX_HEIGHT = Math.round(POSTER_WIDTH * 1.72);
 
 export default function DeckScreen() {
   const insets = useSafeAreaInsets();
@@ -81,7 +105,6 @@ export default function DeckScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [imdbLoading, setImdbLoading] = useState(false);
-  const [selectedAction, setSelectedAction] = useState<Action>('unwatched');
   const stickyAction = useRef<Action>('unwatched');
   const [exitDirection, setExitDirection] = useState<ExitDirection | null>(null);
 
@@ -214,7 +237,7 @@ export default function DeckScreen() {
   }, [index, queue.length, deckExhausted, loadDeck]);
 
   const advanceAfterExit = useCallback(
-    (action: Action) => {
+    () => {
       tx.value = 0;
       ty.value = 0;
       dragOpacity.value = 1;
@@ -223,14 +246,6 @@ export default function DeckScreen() {
       enterTranslateY.value = 12;
       setExitDirection(null);
       setIndex((i) => i + 1);
-      // Sticky: keep the last ←/→ selection across ↑/↓ actions too (matches
-      // web DeckView.tsx's advance()) — only watched/unwatched update the
-      // sticky ref itself, read here rather than derived from `action`.
-      const sticky =
-        stickyAction.current === 'watched' || stickyAction.current === 'unwatched'
-          ? stickyAction.current
-          : 'unwatched';
-      setSelectedAction(sticky);
       busy.current = false;
       busyShared.value = false;
       enterOpacity.value = withTiming(1, { duration: motion.ENTER_DURATION, easing: motion.EXIT_EASING });
@@ -317,22 +332,13 @@ export default function DeckScreen() {
         ty.value = withTiming((dir === 'down' ? 1 : -1) * height * 0.9, cfg);
       }
       dragOpacity.value = withTiming(0, { duration: 180 }, (done) => {
-        if (done) runOnJS(advanceAfterExit)(action);
+        if (done) runOnJS(advanceAfterExit)();
       });
 
       performAction(action, input);
     },
     [advanceAfterExit, busyShared, current, dragOpacity, performAction, tx, ty, cueLatched],
   );
-
-  const handleConfirm = useCallback(() => {
-    commitExit(selectedAction, 'button');
-  }, [commitExit, selectedAction]);
-
-  const handleSelectAction = useCallback((action: Action) => {
-    if (action === 'watched' || action === 'unwatched') stickyAction.current = action;
-    setSelectedAction(action);
-  }, []);
 
   const triggerCueHaptic = useCallback(() => {
     Haptics.selectionAsync();
@@ -541,58 +547,42 @@ export default function DeckScreen() {
         <Text style={styles.imdbLink}>{imdbLoading ? 'Opening…' : 'IMDb ↗'}</Text>
       </Pressable>
 
+      {/* Each button commits immediately on tap — no separate select-then-
+          Confirm step. Matches the swipe gestures, which already commit
+          directly; having buttons work differently was the inconsistency. */}
       <View style={[styles.actionsRow, { paddingBottom: insets.bottom + space.md }]}>
-        <ActionButton action="unwatched" selected={selectedAction} onPress={handleSelectAction} title={current.title} disabled={!!exitDirection} />
-        <ActionButton action="watched" selected={selectedAction} onPress={handleSelectAction} title={current.title} disabled={!!exitDirection} />
+        <ActionButton action="unwatched" onPress={commitExit} title={current.title} disabled={!!exitDirection} />
+        <ActionButton action="watched" onPress={commitExit} title={current.title} disabled={!!exitDirection} />
+        <ActionButton action="watch_later" onPress={commitExit} title={current.title} disabled={!!exitDirection} />
+        <ActionButton action="review_later" onPress={commitExit} title={current.title} disabled={!!exitDirection} />
       </View>
-      <View style={styles.actionsRow}>
-        <ActionButton action="watch_later" selected={selectedAction} onPress={handleSelectAction} title={current.title} disabled={!!exitDirection} />
-        <ActionButton action="review_later" selected={selectedAction} onPress={handleSelectAction} title={current.title} disabled={!!exitDirection} />
-      </View>
-      <Pressable
-        onPress={handleConfirm}
-        disabled={!!exitDirection}
-        style={({ pressed }) => [styles.confirmBtn, (pressed || exitDirection) && styles.pressed]}
-        accessibilityRole="button"
-        accessibilityLabel={`Confirm ${ACTION_META[selectedAction].label} for ${current.title}`}
-        accessibilityState={{ disabled: !!exitDirection }}
-      >
-        <Text style={styles.confirmText}>Confirm</Text>
-      </Pressable>
     </View>
   );
 }
 
 function ActionButton({
   action,
-  selected,
   onPress,
   title,
   disabled,
 }: {
   action: Action;
-  selected: Action;
-  onPress: (a: Action) => void;
+  onPress: (a: Action, input?: 'swipe' | 'button') => void;
   title: string;
   disabled?: boolean;
 }) {
   const meta = ACTION_META[action];
-  const isSelected = selected === action;
   return (
     <Pressable
-      onPress={() => onPress(action)}
+      onPress={() => onPress(action, 'button')}
       disabled={disabled}
-      style={({ pressed }) => [
-        styles.actionBtn,
-        isSelected && { borderColor: meta.tint, backgroundColor: `${meta.tint}22` },
-        (pressed || disabled) && styles.pressed,
-      ]}
+      style={({ pressed }) => [styles.actionBtn, (pressed || disabled) && styles.pressed]}
       accessibilityRole="button"
-      accessibilityLabel={`Select ${meta.label} for ${title}`}
-      accessibilityState={{ selected: isSelected, disabled }}
+      accessibilityLabel={`${meta.label} — ${title}`}
+      accessibilityState={{ disabled }}
     >
-      <Feather name={meta.icon} size={16} color={isSelected ? meta.tint : color.textMuted} />
-      <Text style={[styles.actionBtnText, isSelected && { color: meta.tint }]}>{meta.label}</Text>
+      <Feather name={meta.icon} size={18} color={meta.tint} />
+      <Text style={[styles.actionBtnText, { color: meta.tint }]}>{meta.shortLabel}</Text>
     </Pressable>
   );
 }
@@ -626,8 +616,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   retryText: { color: color.text, fontWeight: '600' },
-  card: { alignItems: 'center', width: '100%', flexShrink: 1 },
-  posterWrap: { width: 220, height: 330, borderRadius: radius.md, overflow: 'hidden', marginBottom: space.md },
+  card: { alignItems: 'center', width: '100%', flex: 1 },
+  posterWrap: {
+    width: POSTER_WIDTH,
+    flex: 1,
+    minHeight: 180,
+    maxHeight: POSTER_MAX_HEIGHT,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    marginBottom: space.md,
+  },
   poster: { width: '100%', height: '100%' },
   posterPlaceholder: { backgroundColor: color.surfaceHigh },
   cue: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
@@ -637,30 +635,22 @@ const styles = StyleSheet.create({
   cueDown: { backgroundColor: `${color.review}33` },
   title: { color: color.text, ...type.title, textAlign: 'center' },
   meta: { color: color.textMuted, fontSize: type.body.fontSize, marginTop: space.xs },
-  imdbHit: { minHeight: 48, justifyContent: 'center', marginTop: space.sm },
+  imdbHit: { minHeight: 44, justifyContent: 'center', marginTop: space.xs },
   imdbLink: { color: color.textMuted, fontSize: type.caption.fontSize, fontWeight: '600' },
-  actionsRow: { flexDirection: 'row', gap: space.sm, width: '100%', marginTop: space.sm },
+  // One compact row of 4 icon-first buttons (was two rows + a separate
+  // Confirm bar) — each commits on tap now, so this is a toolbar, not a
+  // selection UI, and doesn't need the vertical space the old layout used.
+  actionsRow: { flexDirection: 'row', gap: space.xs, width: '100%', marginTop: space.sm },
   actionBtn: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: space.xs,
-    minHeight: 48,
+    gap: 2,
+    minHeight: 52,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: color.border,
   },
-  actionBtnText: { color: color.textMuted, fontSize: type.label.fontSize, fontWeight: '600' },
-  confirmBtn: {
-    width: '100%',
-    minHeight: 48,
-    borderRadius: radius.md,
-    backgroundColor: color.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: space.sm,
-  },
-  confirmText: { color: color.onPrimary, fontSize: type.label.fontSize, fontWeight: '700' },
+  actionBtnText: { fontSize: type.caption.fontSize, fontWeight: '600' },
   muted: { color: color.textMuted },
 });

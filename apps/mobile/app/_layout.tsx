@@ -89,6 +89,7 @@ export default function RootLayout() {
                     <Stack.Screen name="watch-later" />
                     <Stack.Screen name="about" />
                     <Stack.Screen name="filters" options={{ presentation: 'modal' }} />
+                    <Stack.Screen name="menu" options={{ presentation: 'modal' }} />
                   </Stack>
                 </FiltersProvider>
               </NotificationsProvider>
