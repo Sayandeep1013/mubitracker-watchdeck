@@ -1,18 +1,19 @@
 # Plan items 3.2/3.5/3.6 — deck gesture map unified with web, plus the
 # fallback button row so no action is gesture-only.
 #
-# Written 2026-08-13 without a connected Android device — validated by
-# reading deck.tsx's accessibilityLabel strings and ACTION_META table, not
-# by running it. Treat a first run as validating the FLOW as much as the
-# app; fix obvious Maestro syntax issues before trusting a failure as a
-# real regression.
+# Updated 2026-08-14: the button row no longer has a separate Confirm step
+# (user ask — buttons now commit immediately on tap, same as a swipe) and
+# the deck screen now has a hamburger menu instead of some bottom tabs —
+# both changed the accessibilityLabel strings this flow selects by. The
+# "Select X" / "Confirm X" two-step is gone; there's just one tap per
+# action now: `${meta.label} — ${title}` (see ActionButton in deck.tsx).
 #
 # Verifies, in order: swipe left = Haven't, swipe right = Watched,
 # swipe up = Watch Later, swipe down = Review Later, and finally that the
-# same "Review Later" outcome is reachable with zero gestures via the
-# on-screen button row + Confirm (spec 31 §2's "no action may be
-# gesture-only" rule). Each step checks the Undo pill names the card that
-# was just acted on, which only happens if performAction actually ran.
+# same "Haven't" outcome is reachable with zero gestures via a single
+# button tap (spec 31 §2's "no action may be gesture-only" rule). Each
+# step checks the Undo pill names the card that was just acted on, which
+# only happens if performAction actually ran.
 
 appId: host.exp.exponent
 name: Deck gesture map matches web; fallback buttons work
@@ -80,16 +81,14 @@ tags:
 - assertVisible: 'Undo "${titleDown}"'
 - takeScreenshot: deck-gesture-map-all-four-directions
 
-# Fallback buttons only — no swipe at all. Select "Haven't" via the button
-# row, then commit with Confirm, matching accessibilityLabel strings from
-# deck.tsx's ActionButton / handleConfirm.
+# Fallback buttons only — no swipe at all. One tap on "Haven't" commits
+# immediately (no separate Confirm step), matching deck.tsx's ActionButton
+# accessibilityLabel: `${meta.label} — ${title}`.
 - extractTextWithAI:
     query: "The media title shown on the deck card, exactly as written"
     outputVariable: titleButtons
 - tapOn:
-    text: "Select Haven't for ${titleButtons}"
-- tapOn:
-    text: "Confirm Haven't for ${titleButtons}"
+    text: "Haven't — ${titleButtons}"
 - extendedWaitUntil:
     visible: "Undo"
     timeout: 10000

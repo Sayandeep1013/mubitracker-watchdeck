@@ -7,8 +7,10 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { ToastProvider } from '@/components/Toast';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { MenuDrawer } from '@/components/MenuDrawer';
 import { NotificationsProvider } from '@/lib/notifications';
 import { FiltersProvider } from '@/lib/filters';
+import { MenuProvider } from '@/lib/menu';
 import { color } from '@/lib/theme';
 
 function useAuthGuard() {
@@ -79,18 +81,25 @@ export default function RootLayout() {
             {checked ? (
               <NotificationsProvider>
                 <FiltersProvider>
-                  <Stack screenOptions={{ headerShown: false }}>
-                    <Stack.Screen name="(tabs)" />
-                    <Stack.Screen name="login" />
-                    <Stack.Screen name="review/[id]" options={{ presentation: 'modal' }} />
-                    <Stack.Screen name="friends/add" options={{ presentation: 'modal' }} />
-                    <Stack.Screen name="friends/notifications" options={{ presentation: 'modal' }} />
-                    <Stack.Screen name="friends/[id]" />
-                    <Stack.Screen name="watch-later" />
-                    <Stack.Screen name="about" />
-                    <Stack.Screen name="filters" options={{ presentation: 'modal' }} />
-                    <Stack.Screen name="menu" options={{ presentation: 'modal' }} />
-                  </Stack>
+                  <MenuProvider>
+                    {/* MenuDrawer is a sibling of Stack, not a route — it renders
+                        last so it overlays everything (tab bar included) as a
+                        sliding side panel instead of navigating to a full page. */}
+                    <View style={styles.root}>
+                      <Stack screenOptions={{ headerShown: false }}>
+                        <Stack.Screen name="(tabs)" />
+                        <Stack.Screen name="login" />
+                        <Stack.Screen name="review/[id]" options={{ presentation: 'modal' }} />
+                        <Stack.Screen name="friends/add" options={{ presentation: 'modal' }} />
+                        <Stack.Screen name="friends/notifications" options={{ presentation: 'modal' }} />
+                        <Stack.Screen name="friends/[id]" />
+                        <Stack.Screen name="watch-later" />
+                        <Stack.Screen name="about" />
+                        <Stack.Screen name="filters" options={{ presentation: 'modal' }} />
+                      </Stack>
+                      <MenuDrawer />
+                    </View>
+                  </MenuProvider>
                 </FiltersProvider>
               </NotificationsProvider>
             ) : (

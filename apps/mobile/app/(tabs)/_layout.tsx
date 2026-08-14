@@ -3,6 +3,7 @@ import { Tabs, useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNotifications } from '@/lib/notifications';
 import { useFilters } from '@/lib/filters';
+import { useMenu } from '@/lib/menu';
 import { color as themeColor, space } from '@/lib/theme';
 
 type FeatherName = keyof typeof Feather.glyphMap;
@@ -14,11 +15,11 @@ function TabIcon(name: FeatherName) {
 }
 
 function HamburgerHeaderLeft() {
-  const router = useRouter();
+  const { open } = useMenu();
 
   return (
     <Pressable
-      onPress={() => router.push('/menu')}
+      onPress={open}
       hitSlop={8}
       style={styles.headerBtn}
       accessibilityRole="button"
@@ -101,8 +102,6 @@ function FriendsHeaderRight() {
 }
 
 export default function TabLayout() {
-  const { unreadCount } = useNotifications();
-
   return (
     <Tabs
       screenOptions={{
@@ -119,20 +118,18 @@ export default function TabLayout() {
         options={{ title: 'Deck', tabBarIcon: TabIcon('layers'), headerRight: DeckHeaderRight }}
       />
       <Tabs.Screen name="search" options={{ title: 'Search', tabBarIcon: TabIcon('search') }} />
-      {/* Collection/Review Later/Friends/Profile stay real routes (reachable
-          from the hamburger menu, and still deep-linkable) — `href: null`
-          just drops their button from the bottom tab bar, which was
-          crowded at 6 items. Deck and Search are the two the user actually
-          taps repeatedly; the rest are occasional. */}
       <Tabs.Screen
         name="collection"
         options={{
           title: 'Collection',
           tabBarIcon: TabIcon('grid'),
           headerRight: CollectionHeaderRight,
-          href: null,
         }}
       />
+      {/* Review Later and Friends moved into the side drawer (MenuDrawer) —
+          the dock stays at 4 items (Deck, Search, Collection, Profile), the
+          ones actually tapped often. `href: null` keeps them real,
+          deep-linkable routes; it only drops their button from the bar. */}
       <Tabs.Screen
         name="review-later"
         options={{ title: 'Review Later', tabBarIcon: TabIcon('bookmark'), href: null }}
@@ -142,15 +139,11 @@ export default function TabLayout() {
         options={{
           title: 'Friends',
           tabBarIcon: TabIcon('users'),
-          tabBarBadge: unreadCount > 0 ? (unreadCount > 9 ? '9+' : unreadCount) : undefined,
           headerRight: FriendsHeaderRight,
           href: null,
         }}
       />
-      <Tabs.Screen
-        name="profile"
-        options={{ title: 'Profile', tabBarIcon: TabIcon('user'), href: null }}
-      />
+      <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: TabIcon('user') }} />
     </Tabs>
   );
 }

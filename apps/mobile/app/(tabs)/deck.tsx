@@ -20,7 +20,7 @@ import { apiClient } from '@/lib/api';
 import { enqueueOfflineAction, syncOfflineQueue } from '@/lib/offline-queue';
 import { useFilters } from '@/lib/filters';
 import { useToast } from '@/components/Toast';
-import { color, motion, radius, space, type } from '@/lib/theme';
+import { color, hitSlopFor, motion, radius, space, type } from '@/lib/theme';
 
 type Action = 'unwatched' | 'watched' | 'watch_later' | 'review_later';
 type ExitDirection = 'left' | 'right' | 'up' | 'down';
@@ -76,7 +76,11 @@ function filterKeys(filters: ReturnType<typeof useFilters>['filters']): string[]
 // dvh-based clamp, just expressed as RN flexbox instead of a CSS clamp().
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const POSTER_WIDTH = Math.min(SCREEN_WIDTH * 0.7, 300);
-const POSTER_MAX_HEIGHT = Math.round(POSTER_WIDTH * 1.72);
+// Raised from 1.72 after removing the Undo banner row (now a small corner
+// chip on the poster itself, see below) freed up real vertical room — the
+// cap can afford to be taller without reintroducing the overlap this ratio
+// caused before.
+const POSTER_MAX_HEIGHT = Math.round(POSTER_WIDTH * 2.05);
 
 export default function DeckScreen() {
   const insets = useSafeAreaInsets();
@@ -491,22 +495,8 @@ export default function DeckScreen() {
   const poster = tmdbPosterUrl(current.posterPath, 'deck');
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + space.lg }]}>
+    <View style={[styles.container, { paddingTop: insets.top + space.sm }]}>
       <Text style={styles.hint}>← Haven&apos;t · Watched → · ↑ Watch Later · ↓ Review Later</Text>
-      {undoStack.length > 0 && (
-        <Pressable
-          onPress={handleUndo}
-          disabled={undoing}
-          style={({ pressed }) => [styles.undoButton, pressed && styles.pressed]}
-          accessibilityRole="button"
-          accessibilityLabel={`Undo marking ${undoStack[0].title}`}
-          accessibilityState={{ disabled: undoing }}
-        >
-          <Text style={styles.undoButtonText}>
-            {undoing ? 'Undoing…' : `↺ Undo "${undoStack[0].title}"`}
-          </Text>
-        </Pressable>
-      )}
 
       <GestureDetector gesture={pan}>
         <Animated.View style={[styles.card, cardStyle]}>
@@ -528,6 +518,25 @@ export default function DeckScreen() {
             <Animated.View style={[styles.cue, styles.cueDown, downCueStyle]} pointerEvents="none">
               <Feather name="bookmark" size={64} color={color.review} />
             </Animated.View>
+            {/* Undo used to be a full-width pill ABOVE the poster — read as a
+                primary action when it's actually a rare, secondary utility.
+                A small corner chip over the poster itself (like a photo
+                app's undo toast) keeps it reachable without claiming its
+                own row or competing with the poster for attention. */}
+            {undoStack.length > 0 && (
+              <Pressable
+                onPress={handleUndo}
+                disabled={undoing}
+                hitSlop={hitSlopFor(32)}
+                style={({ pressed }) => [styles.undoChip, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityLabel={`Undo marking ${undoStack[0].title}`}
+                accessibilityState={{ disabled: undoing }}
+              >
+                <Feather name="rotate-ccw" size={13} color={color.text} />
+                <Text style={styles.undoChipText}>{undoing ? 'Undoing…' : 'Undo'}</Text>
+              </Pressable>
+            )}
           </View>
           <Text style={styles.title}>{current.title}</Text>
           <Text style={styles.meta}>
@@ -550,7 +559,7 @@ export default function DeckScreen() {
       {/* Each button commits immediately on tap — no separate select-then-
           Confirm step. Matches the swipe gestures, which already commit
           directly; having buttons work differently was the inconsistency. */}
-      <View style={[styles.actionsRow, { paddingBottom: insets.bottom + space.md }]}>
+      <View style={[styles.actionsRow, { paddingBottom: insets.bottom + space.xs }]}>
         <ActionButton action="unwatched" onPress={commitExit} title={current.title} disabled={!!exitDirection} />
         <ActionButton action="watched" onPress={commitExit} title={current.title} disabled={!!exitDirection} />
         <ActionButton action="watch_later" onPress={commitExit} title={current.title} disabled={!!exitDirection} />
@@ -590,20 +599,21 @@ function ActionButton({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: color.bg, alignItems: 'center', paddingHorizontal: space.lg },
   center: { flex: 1, backgroundColor: color.bg, alignItems: 'center', justifyContent: 'center', padding: space.xl },
-  hint: { color: color.textMuted, fontSize: type.caption.fontSize, marginBottom: space.sm, textAlign: 'center' },
-  undoButton: {
-    backgroundColor: color.surface,
-    borderColor: color.border,
-    borderWidth: 1,
-    borderRadius: radius.pill,
-    paddingVertical: space.sm,
-    paddingHorizontal: space.lg,
-    minHeight: 48,
-    justifyContent: 'center',
-    marginBottom: space.sm,
-  },
+  hint: { color: color.textMuted, fontSize: type.caption.fontSize, marginBottom: space.xs, textAlign: 'center' },
   pressed: { opacity: 0.7 },
-  undoButtonText: { color: color.text, fontSize: type.label.fontSize, fontWeight: '600' },
+  undoChip: {
+    position: 'absolute',
+    top: space.sm,
+    right: space.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(9,9,11,0.72)',
+    borderRadius: radius.pill,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  undoChipText: { color: color.text, fontSize: type.caption.fontSize, fontWeight: '600' },
   errorText: { color: color.danger, fontSize: type.body.fontSize, textAlign: 'center', marginBottom: space.lg },
   retryButton: {
     backgroundColor: color.surface,
