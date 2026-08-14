@@ -36,27 +36,29 @@ your own direction.
 
 **What genuinely needs picking up, in priority order:**
 
-1. **`mobile-e2e` nightly job's actual flow run is unconfirmed** (spec 50
-   §3, `.github/workflows/nightly.yml`). Two real dispatch-and-fix rounds
-   this session got the job all the way through emulator boot + KVM +
-   Expo Go sideload (see Session Log for the exact bugs found and fixed —
-   this is real, load-bearing infrastructure, not a guess). What's
-   **still unverified**: `mobile-qa/subflows/open-project.yaml` taps a
-   "Recently opened → Mubitracker" row in Expo Go to connect to the dev
-   server — that row only exists after Expo Go has connected to this
-   project at least once. A freshly-sideloaded CI emulator has zero
-   connection history, so this step may simply have nothing to tap. This
-   was never actually confirmed to work or fail — the workflow wasn't
-   re-dispatched after the last fix due to session time, not because the
-   risk was resolved. If you have `workflow_dispatch` access (a GitHub
-   PAT with `repo`+`workflow` scope; see §7 fallback tooling notes in
-   CONTEXT.md for how to set one up as repo Secrets/Variables), dispatch
-   `nightly.yml` and read the actual failure. If it does hit this gap,
-   the fix is adding a first-run fallback to `open-project.yaml` — try
-   the "Recently opened" tap, and if it's not visible within a shorter
-   timeout, fall back to Expo Go's manual "Enter URL manually" field
-   (exact UI text unverified — read it off a real screenshot/inspection
-   first, don't guess).
+1. **`mobile-e2e` nightly job hangs — root cause still unknown** (spec 50
+   §3, `.github/workflows/nightly.yml`). Three real dispatch-and-fix
+   rounds this session got the job through emulator boot + KVM + Maestro
+   install every time (real, load-bearing infrastructure, not a guess —
+   see Session Log for the exact bugs found and fixed in rounds 1-2).
+   **Round 3 then hung completely silently for 45+ minutes** — zero log
+   output between "emulator booted" and the point it was manually
+   cancelled via the Actions API. No step had a timeout, so there's no
+   log evidence of which step (APK `curl`, `adb install`, Metro startup)
+   actually stalled. Added timeouts to every step + a job-level
+   `timeout-minutes: 20` backstop (`7590018`) so the *next* dispatch
+   fails fast with a diagnosable log instead of hanging again — this is
+   a safety net, not a fix; the underlying cause is still open. Dispatch
+   `nightly.yml` (GitHub PAT with `repo`+`workflow` scope needed — see §7
+   fallback tooling notes in CONTEXT.md for how to set one up as repo
+   Secrets/Variables) and read exactly which new timeout fires. Once
+   that's fixed, there's a *second*, separate, still-unverified risk:
+   `mobile-qa/subflows/open-project.yaml` taps a "Recently opened →
+   Mubitracker" row in Expo Go, which only exists after a prior
+   connection — a freshly-sideloaded CI emulator has zero history, so
+   this may have nothing to tap. If it hits that, the fix is a first-run
+   fallback to Expo Go's manual "Enter URL manually" field (exact UI text
+   unverified — read it off a real screenshot first, don't guess).
 2. Everything in the "Pending verification" table below — unchanged
    carryover from Stage 0/3/4, still needs the Android device.
 3. Optional cleanup, not blocking: `pnpm test:e2e`'s 6 specs and
@@ -77,7 +79,7 @@ Stop and ask me only if an item needs a product decision that isn't
 already settled in docs/spec/. Otherwise keep going.
 ```
 
-**Current position: Stages 0-1, all of Stage 2 (2.1-2.7), all of Stage 3, all of Stage 4, and all of Stage 5 (5.1-5.9, `2026-08-14`, main at `4c8b950`) are done. IMPLEMENTATION-PLAN.md's explicit backlog is exhausted — there is no Stage 6 yet. Deck v2 is behind `DECK_ENGINE=v2` (unset in prod); Stage 2.8 needs the user's go-ahead. Stage 5.5 (staging Supabase) is a dated waiver, not shipped — needs the user's Supabase dashboard access. Stage 5's `mobile-e2e` nightly job is real, working infrastructure (real emulator, real Expo Go sideload, both confirmed via actual `workflow_dispatch` runs — not guessed) but its actual flow run against a zero-history Expo Go install is unconfirmed; see the Next-session block above for the exact risk and how to close it. Everything mobile-touching from Stages 0/3/4 remains `[~]`, unchanged carryover, still needs the Android device.**
+**Current position: Stages 0-1, all of Stage 2 (2.1-2.7), all of Stage 3, all of Stage 4, and all of Stage 5 (5.1-5.9, `2026-08-14`, main at `7590018`) are done or explicitly accounted for. IMPLEMENTATION-PLAN.md's explicit backlog is exhausted — there is no Stage 6 yet. Deck v2 is behind `DECK_ENGINE=v2` (unset in prod); Stage 2.8 needs the user's go-ahead. Stage 5.5 (staging Supabase) is a dated waiver, not shipped — needs the user's Supabase dashboard access. Stage 5.3's `mobile-e2e` nightly job is real, working infrastructure through emulator boot/KVM/Maestro install (confirmed via three actual `workflow_dispatch` runs — not guessed) but round 3 hung silently for 45+ minutes with no diagnosable log; fail-fast timeouts were added as a safety net (`7590018`) but the hang's root cause is still open — see the Next-session block above for exactly what the next dispatch needs to reveal. Everything mobile-touching from Stages 0/3/4 remains `[~]`, unchanged carryover, still needs the Android device.**
 
 ### Pending verification
 
@@ -185,11 +187,18 @@ being `{data: {...}}`, not flat, before it ever ran. **Round 2** — even with c
 `script:` field runs each line as its own independent subshell (visible as two separate `[command]`
 log entries), so no variable set on one line survives to the next. Consolidated the whole
 sideload→Metro→Maestro sequence into one file, `scripts/mobile-e2e-nightly.sh`, invoked as a single
-`run:` line. **Not yet re-dispatched after round 2's fix** (session time) — the emulator boot, KVM
-setup, and Maestro install were already confirmed working in rounds 1-2, so what's still genuinely
-open is whether `mobile-qa/subflows/open-project.yaml`'s "tap the Recently-opened Mubitracker row"
-step works against a *freshly sideloaded* Expo Go with zero connection history — see the Next
-Session block above for the exact risk and fallback approach if it doesn't.
+`run:` line. **Round 3** — re-dispatched with the fix; got past emulator boot, KVM, and Maestro
+install (all confirmed working again), then **hung completely silently for 45+ minutes** with zero
+log output, until manually cancelled via the Actions API (`POST .../runs/{id}/cancel`). No step had
+a timeout, so a stall in the APK `curl`, `adb install`, or Metro startup had no way to fail visibly
+or leave a diagnosable log — the actual stuck step is still unknown. Added `curl --max-time 180`,
+`timeout 120` on `adb install`, an explicit fail-fast if Metro isn't ready within 60s (previously
+silent), `timeout 600` on the Maestro run, and a job-level `timeout-minutes: 20` backstop —
+defensive fail-fast measures only, **not a confirmed fix**; no further dispatch was run this
+session. Left at `[~]`. Whether `mobile-qa/subflows/open-project.yaml`'s "tap the Recently-opened
+Mubitracker row" step works against a zero-history fresh Expo Go install is *also* still unverified
+and may be a second, separate issue once the hang itself is diagnosed — don't assume fixing the hang
+automatically resolves that risk too.
 
 **5.4 TMDB caching + rate limiting.** New `tmdb_cache` (6h discover / 24h details+external_ids / 15m
 search TTLs, cache key never includes `api_key`) and `tmdb_rate_limit` (atomic 1-second-window
