@@ -68,15 +68,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           script: |
-            SDK_VERSION=$(node -p "require('./apps/mobile/package.json').dependencies.expo.replace(/[^0-9.].*/, '')" 2>/dev/null || echo "")
-            APK_URL=$(curl -fsSL "https://api.expo.dev/v2/versions/latest" | node -e "
-              let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
-                const j = JSON.parse(d);
-                const versions = Object.keys(j.sdkVersions).sort().reverse();
-                const key = versions.find(v => v.startsWith('54.'));
-                console.log(j.sdkVersions[key || versions[0]].androidClientUrl);
-              });
-            ")
+            APK_URL=$(node scripts/resolve-expo-go-apk.mjs)
             echo "Expo Go APK: $APK_URL"
             curl -fsSL "$APK_URL" -o expo-go.apk
             adb install -r expo-go.apk
