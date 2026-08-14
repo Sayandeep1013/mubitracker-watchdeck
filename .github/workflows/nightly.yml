@@ -67,24 +67,11 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
-          script: |
-            APK_URL=$(node scripts/resolve-expo-go-apk.mjs)
-            echo "Expo Go APK: $APK_URL"
-            curl -fsSL "$APK_URL" -o expo-go.apk
-            adb install -r expo-go.apk
-
-            pnpm --filter @mubitracker/mobile dev --non-interactive &
-            METRO_PID=$!
-            # Metro's first bundle build is the slow part — poll instead of a fixed sleep.
-            for i in $(seq 1 30); do
-              curl -fsS http://127.0.0.1:8081/status && break
-              sleep 2
-            done
-            adb reverse tcp:8081 tcp:8081
-
-            maestro test mobile-qa/flows/ || MAESTRO_EXIT=$?
-            kill $METRO_PID || true
-            exit ${MAESTRO_EXIT:-0}
+          # One script file invoked as a single line, not an inline
+          # multi-line script — this action runs each line of a multi-line
+          # `script:` as its own subshell, so a variable set on one line
+          # (e.g. APK_URL=...) reads back empty on the next.
+          script: bash scripts/mobile-e2e-nightly.sh
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
