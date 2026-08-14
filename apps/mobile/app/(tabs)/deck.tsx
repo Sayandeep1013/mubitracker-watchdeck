@@ -176,7 +176,6 @@ export default function DeckScreen() {
   const enterOpacity = useSharedValue(1);
   const enterScale = useSharedValue(1);
   const enterTranslateY = useSharedValue(0);
-  const cueLatched = useSharedValue(false);
   // Mirrors `busy.current` but readable from the gesture worklet (UI
   // thread) — a ref can't be read there. Without this, starting a new drag
   // while the previous card is still mid-exit would overwrite tx/ty out
@@ -383,7 +382,6 @@ export default function DeckScreen() {
       busy.current = true;
       busyShared.value = true;
       setExitDirection(ACTION_META[action].dir);
-      cueLatched.value = false;
 
       const { width, height } = Dimensions.get('window');
       const cfg = { duration: motion.EXIT_DURATION, easing: motion.EXIT_EASING };
@@ -399,12 +397,8 @@ export default function DeckScreen() {
 
       performAction(action, input);
     },
-    [advanceAfterExit, busyShared, current, dragOpacity, performAction, tx, ty, cueLatched],
+    [advanceAfterExit, busyShared, current, dragOpacity, performAction, tx, ty],
   );
-
-  const triggerCueHaptic = useCallback(() => {
-    Haptics.selectionAsync();
-  }, []);
 
   const openImdb = async () => {
     if (!current || imdbLoading) return;
@@ -497,21 +491,17 @@ export default function DeckScreen() {
   }, [navigation, undoStack, undoing, activeCount, router]);
 
   const pan = Gesture.Pan()
-    .onBegin(() => {
-      cueLatched.value = false;
-    })
+    // Used to also fire a `selectionAsync` haptic here the moment a drag
+    // crossed the cue threshold, on top of `fireActionHaptic` on commit —
+    // confirmed live that read as "two separate haptics" for one swipe,
+    // not the intended cue-then-commit sequence. Now exactly one haptic
+    // per action, fired only on commit; the visual cue (corner stamps
+    // fading in) is untouched, since that's driven by tx/ty directly.
     .onUpdate((e) => {
       if (busyShared.value) return;
       tx.value = e.translationX;
       ty.value = e.translationY;
       dragOpacity.value = 1 - Math.min(Math.abs(e.translationX) / 300, 0.3);
-      const crossed =
-        Math.abs(e.translationX) > motion.CUE_THRESHOLD_X ||
-        Math.abs(e.translationY) > motion.CUE_THRESHOLD_Y;
-      if (crossed && !cueLatched.value) {
-        cueLatched.value = true;
-        runOnJS(triggerCueHaptic)();
-      }
     })
     .onEnd((e) => {
       if (busyShared.value) return;
