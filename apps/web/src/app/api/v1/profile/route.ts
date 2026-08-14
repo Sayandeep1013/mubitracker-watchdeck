@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { updateProfileSchema } from '@mubitracker/shared';
-import { apiError, apiOk, AuthError, requireAuth } from '@/lib/api/helpers';
+import { apiError, apiOk, AuthError, errorMessage, requireAuth } from '@/lib/api/helpers';
 import { createSupabaseAdminClient } from '@/lib/supabase/server';
 import type { TablesUpdate } from '@/lib/supabase/database.types';
 import { friendshipInvolvingUserFilter } from '@/lib/social/friends';
@@ -91,7 +91,7 @@ export async function PATCH(request: NextRequest) {
     return apiOk(data);
   } catch (e) {
     if (e instanceof AuthError) return apiError('UNAUTHORIZED', e.message, 401);
-    return apiError('BAD_REQUEST', e instanceof Error ? e.message : 'Invalid request', 400);
+    return apiError('BAD_REQUEST', errorMessage(e, 'Invalid request'), 400);
   }
 }
 

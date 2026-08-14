@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { friendRequestSchema, normalizeUsername } from '@mubitracker/shared';
-import { apiError, apiOk, AuthError, requireAuth } from '@/lib/api/helpers';
+import { apiError, apiOk, AuthError, errorMessage, requireAuth } from '@/lib/api/helpers';
 import { createSupabaseAdminClient } from '@/lib/supabase/server';
 import { friendshipInvolvingUserFilter, friendshipPairFilter } from '@/lib/social/friends';
 
@@ -163,6 +163,6 @@ export async function POST(request: NextRequest) {
     return apiOk(await enrichFriendship(supabase, data, user.id), 201);
   } catch (e) {
     if (e instanceof AuthError) return apiError('UNAUTHORIZED', e.message, 401);
-    return apiError('BAD_REQUEST', e instanceof Error ? e.message : 'Invalid request', 400);
+    return apiError('BAD_REQUEST', errorMessage(e, 'Invalid request'), 400);
   }
 }

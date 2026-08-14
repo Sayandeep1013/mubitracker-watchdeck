@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { updateUserMediaSchema } from '@mubitracker/shared';
-import { apiError, apiOk, AuthError, requireAuth } from '@/lib/api/helpers';
+import { apiError, apiOk, AuthError, errorMessage, requireAuth } from '@/lib/api/helpers';
 import { upsertUserMedia } from '@/lib/media/repository';
 import { createSupabaseAdminClient } from '@/lib/supabase/server';
 
@@ -25,6 +25,6 @@ export async function PUT(
     return apiOk(data);
   } catch (e) {
     if (e instanceof AuthError) return apiError('UNAUTHORIZED', e.message, 401);
-    return apiError('BAD_REQUEST', e instanceof Error ? e.message : 'Invalid request', 400);
+    return apiError('BAD_REQUEST', errorMessage(e, 'Invalid request'), 400);
   }
 }

@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import type { AnalyticsEventName } from '@mubitracker/shared';
-import { apiError, apiOk, AuthError, requireAuth } from '@/lib/api/helpers';
+import { apiError, apiOk, AuthError, errorMessage, requireAuth } from '@/lib/api/helpers';
 import { createSupabaseAdminClient } from '@/lib/supabase/server';
 
 const VALID_EVENTS: AnalyticsEventName[] = [
@@ -43,6 +43,6 @@ export async function POST(request: NextRequest) {
     return apiOk({ ok: true }, 202);
   } catch (e) {
     if (e instanceof AuthError) return apiError('UNAUTHORIZED', e.message, 401);
-    return apiError('INTERNAL', e instanceof Error ? e.message : 'Failed to record event', 500);
+    return apiError('INTERNAL', errorMessage(e, 'Failed to record event'), 500);
   }
 }

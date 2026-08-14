@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { importSchema } from '@mubitracker/shared';
-import { apiError, apiOk, AuthError, requireAuth } from '@/lib/api/helpers';
+import { apiError, apiOk, AuthError, errorMessage, requireAuth } from '@/lib/api/helpers';
 import { upsertMedia, upsertUserMedia } from '@/lib/media/repository';
 import { tmdbGetDetails } from '@/lib/tmdb/provider';
 import { createSupabaseAdminClient } from '@/lib/supabase/server';
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
 
         imported++;
       } catch (e) {
-        errors.push(`${item.title}: ${e instanceof Error ? e.message : 'failed'}`);
+        errors.push(`${item.title}: ${errorMessage(e, 'failed')}`);
         skipped++;
       }
     }
@@ -67,6 +67,6 @@ export async function POST(request: NextRequest) {
     return apiOk({ imported, skipped, errors });
   } catch (e) {
     if (e instanceof AuthError) return apiError('UNAUTHORIZED', e.message, 401);
-    return apiError('BAD_REQUEST', e instanceof Error ? e.message : 'Invalid import', 400);
+    return apiError('BAD_REQUEST', errorMessage(e, 'Invalid import'), 400);
   }
 }

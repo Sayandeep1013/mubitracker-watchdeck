@@ -4,7 +4,7 @@ import {
   isValidUsername,
   usernameToAuthEmail,
 } from '@mubitracker/shared';
-import { apiError, apiOk } from '@/lib/api/helpers';
+import { apiError, apiOk, errorMessage } from '@/lib/api/helpers';
 import { createSupabaseAdminClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
@@ -46,6 +46,6 @@ export async function POST(request: NextRequest) {
 
     return apiOk({ id: data.user.id, username }, 201);
   } catch (e) {
-    return apiError('BAD_REQUEST', e instanceof Error ? e.message : 'Invalid request', 400);
+    return apiError('BAD_REQUEST', errorMessage(e, 'Invalid request'), 400);
   }
 }
