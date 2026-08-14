@@ -169,7 +169,7 @@ export default function ProfileScreen() {
 
       <Pressable
         style={({ pressed }) => [styles.btn, glassChip(color.textMuted), pressed && styles.pressed]}
-        onPress={() => router.push('/about')}
+        onPress={() => router.push('/(tabs)/about')}
         accessibilityRole="button"
         accessibilityLabel="About and TMDB credits"
       >

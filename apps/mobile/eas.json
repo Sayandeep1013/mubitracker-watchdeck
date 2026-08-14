@@ -1,0 +1,33 @@
+{
+  "cli": {
+    "version": ">= 21.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://deslckxkuvbfugdxibdn.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRlc2xja3hrdXZiZnVnZHhpYmRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0ODA3OTksImV4cCI6MjEwMjA1Njc5OX0.JWYydS445NtfxHDApOpsrmPIM2zjnoii8t59RdQXqoc",
+        "EXPO_PUBLIC_API_URL": "https://mubitracker-watchdeck-web.vercel.app"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://deslckxkuvbfugdxibdn.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRlc2xja3hrdXZiZnVnZHhpYmRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0ODA3OTksImV4cCI6MjEwMjA1Njc5OX0.JWYydS445NtfxHDApOpsrmPIM2zjnoii8t59RdQXqoc",
+        "EXPO_PUBLIC_API_URL": "https://mubitracker-watchdeck-web.vercel.app"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

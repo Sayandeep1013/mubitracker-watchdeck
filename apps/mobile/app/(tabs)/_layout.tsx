@@ -57,7 +57,7 @@ function CollectionHeaderRight() {
 
   return (
     <Pressable
-      onPress={() => router.push('/watch-later')}
+      onPress={() => router.push('/(tabs)/watch-later')}
       hitSlop={8}
       style={styles.headerBtn}
       accessibilityRole="button"
@@ -183,6 +183,18 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: TabIcon('user') }} />
+      {/* Watch Later and About used to be separate root-level routes with
+          their own hand-rolled "Title + Close" header and a plain Stack
+          push, which read as a different, less-finished screen type next
+          to Review Later/Friends (shared Tabs header with the hamburger
+          menu, consistent push transition). Moved in here for the same
+          reason those two were: `href: null` keeps them real, deep-linkable
+          routes without adding a 6th item to the tab bar. */}
+      <Tabs.Screen
+        name="watch-later"
+        options={{ title: 'Watch Later', tabBarIcon: TabIcon('clock'), href: null }}
+      />
+      <Tabs.Screen name="about" options={{ title: 'About', tabBarIcon: TabIcon('info'), href: null }} />
     </Tabs>
   );
 }

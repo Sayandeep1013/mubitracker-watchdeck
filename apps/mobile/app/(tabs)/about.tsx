@@ -1,24 +1,11 @@
-import { useRouter } from 'expo-router';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { color, glassCard, space, type } from '@/lib/theme';
 
 const TMDB_URL = 'https://www.themoviedb.org/';
 
 export default function AboutScreen() {
-  const router = useRouter();
-
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
-      <Pressable
-        onPress={() => router.back()}
-        hitSlop={8}
-        style={styles.backHit}
-        accessibilityRole="button"
-        accessibilityLabel="Back"
-      >
-        <Text style={styles.backText}>← Back</Text>
-      </Pressable>
-
       <Text style={styles.heading}>About Mubitracker</Text>
       <Text style={styles.body}>
         Mubitracker is a frictionless personal media memory system. Track what you&apos;ve watched
@@ -47,8 +34,6 @@ export default function AboutScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: color.bg },
   content: { padding: space.lg },
-  backHit: { minHeight: 44, justifyContent: 'center', marginBottom: space.md },
-  backText: { color: color.textMuted, fontSize: type.caption.fontSize },
   heading: { color: color.text, ...type.headline, marginBottom: space.md },
   body: { color: color.textMuted, marginBottom: space.md, lineHeight: 20 },
   card: {

@@ -15,7 +15,7 @@ const DRAWER_WIDTH = Math.min(SCREEN_WIDTH * 0.78, 320);
 
 interface MenuItem {
   label: string;
-  href: '/(tabs)/review-later' | '/(tabs)/friends' | '/watch-later' | '/about';
+  href: '/(tabs)/review-later' | '/(tabs)/friends' | '/(tabs)/watch-later' | '/(tabs)/about';
   icon: FeatherName;
   badge?: number;
 }
@@ -53,8 +53,8 @@ export function MenuDrawer() {
   const items: MenuItem[] = [
     { label: 'Review Later', href: '/(tabs)/review-later', icon: 'bookmark' },
     { label: 'Friends', href: '/(tabs)/friends', icon: 'users', badge: unreadCount },
-    { label: 'Watch Later', href: '/watch-later', icon: 'clock' },
-    { label: 'About', href: '/about', icon: 'info' },
+    { label: 'Watch Later', href: '/(tabs)/watch-later', icon: 'clock' },
+    { label: 'About', href: '/(tabs)/about', icon: 'info' },
   ];
 
   return (
@@ -87,18 +87,22 @@ export function MenuDrawer() {
                 close();
                 router.push(item.href);
               }}
-              style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.row, pressed ? styles.rowPressed : styles.rowIdle]}
               accessibilityRole="button"
               accessibilityLabel={item.label}
             >
-              <View style={styles.iconBadge}>
-                <Feather name={item.icon} size={15} color={color.primary} />
-              </View>
-              <Text style={styles.rowText}>{item.label}</Text>
-              {!!item.badge && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{item.badge > 9 ? '9+' : item.badge}</Text>
-                </View>
+              {({ pressed }) => (
+                <>
+                  <View style={[styles.iconBadge, pressed && styles.iconBadgePressed]}>
+                    <Feather name={item.icon} size={15} color={pressed ? color.primary : color.textMuted} />
+                  </View>
+                  <Text style={[styles.rowText, pressed && styles.rowTextPressed]}>{item.label}</Text>
+                  {!!item.badge && (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>{item.badge > 9 ? '9+' : item.badge}</Text>
+                    </View>
+                  )}
+                </>
               )}
             </Pressable>
           ))}
@@ -127,11 +131,12 @@ const styles = StyleSheet.create({
   },
   drawerContent: { flex: 1, paddingHorizontal: space.lg },
   title: { color: color.text, ...type.headline, marginBottom: space.lg },
-  // A muted version of the "Undo button" glass look — confirmed live the
-  // full-opacity red border + 56dp rows read as "too bright and big" for
-  // four rows stacked in a list (the Undo pill is a single small one-off
-  // accent, not meant to tile). Lower alpha border, smaller fill, more
-  // compact sizing; still recognizably the same red-glass language.
+  // Every row wearing the red glass look at once (its permanent idle state)
+  // read as "everything is currently selected" — confirmed live. These are
+  // navigation links, not toggles, so there's no real "selected" item to
+  // show; instead the row stays neutral (like an inactive filter chip) and
+  // only goes red on the brief pressed frame, mirroring the filter chips'
+  // own idle/active split (collection.tsx's chip/chipInactive).
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -140,25 +145,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.sm,
     paddingVertical: space.xs,
     marginBottom: space.xs,
-    // Same corner radius as every other glass card/row in the app
-    // (glassCard()'s default radius.md) — confirmed live a one-off 10
-    // read as visibly different next to Collection/Friends/Review Later's
-    // rows right after switching screens.
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: `${color.primary}40`,
-    backgroundColor: `${color.primary}0F`,
   },
+  rowIdle: { borderColor: color.border, backgroundColor: color.surface },
+  rowPressed: { borderColor: color.primary, backgroundColor: `${color.primary}1F` },
   iconBadge: {
     width: 28,
     height: 28,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(239,68,68,0.12)',
+    backgroundColor: color.surfaceHigh,
   },
-  pressed: { opacity: 0.7 },
+  iconBadgePressed: { backgroundColor: 'rgba(239,68,68,0.15)' },
   rowText: { color: color.text, fontSize: type.label.fontSize, fontWeight: '600', flex: 1 },
+  rowTextPressed: { color: color.primary },
   badge: {
     minWidth: 20,
     height: 20,

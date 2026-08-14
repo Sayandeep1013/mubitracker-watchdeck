@@ -1,7 +1,5 @@
-import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { tmdbPosterUrl } from '@mubitracker/shared';
 import { apiClient } from '@/lib/api';
 import { useFocusFetch } from '@/lib/useFocusFetch';
@@ -18,7 +16,6 @@ interface WatchLaterItem {
 }
 
 export default function WatchLaterScreen() {
-  const router = useRouter();
   const showToast = useToast();
   const fetcher = useCallback(async () => (await apiClient.getWatchLater()) as WatchLaterItem[], []);
   const { data, loading, error, reload } = useFocusFetch<WatchLaterItem[]>(fetcher);
@@ -49,22 +46,9 @@ export default function WatchLaterScreen() {
   // loading" — not a network/fetch problem, just this render bug.
   const showState = !!error || items.length === 0;
 
-  return (
-    <SafeAreaView style={styles.flex} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Watch Later</Text>
-        <Pressable
-          onPress={() => router.back()}
-          hitSlop={8}
-          style={styles.closeHit}
-          accessibilityRole="button"
-          accessibilityLabel="Close"
-        >
-          <Text style={styles.closeText}>Close</Text>
-        </Pressable>
-      </View>
-
-      {showState ? (
+  if (showState) {
+    return (
+      <View style={styles.flex}>
         <ScreenState
           loading={loading && items.length === 0}
           error={error}
@@ -72,63 +56,57 @@ export default function WatchLaterScreen() {
           emptyText="Nothing saved yet — on the deck, swipe up for Watch Later."
           onRetry={reload}
         />
-      ) : (
-        <FlatList
-          data={items}
-          keyExtractor={(item) => item.id}
-          refreshing={loading}
-          onRefresh={reload}
-          contentContainerStyle={styles.list}
-          renderItem={({ item }) => {
-            const poster = tmdbPosterUrl(item.posterPath, 'card');
-            const busy = markingId === item.id;
-            return (
-              <View style={[styles.row, glassCard()]}>
-                {poster ? (
-                  <Image source={{ uri: poster }} style={styles.poster} />
-                ) : (
-                  <View style={[styles.poster, styles.posterPlaceholder]} />
-                )}
-                <View style={styles.rowBody}>
-                  <Text style={styles.title} numberOfLines={2}>
-                    {item.title}
-                  </Text>
-                  <Text style={styles.meta}>
-                    {item.year ?? '—'} · {item.displayType}
-                  </Text>
-                  <Pressable
-                    onPress={() => markWatched(item)}
-                    disabled={busy}
-                    hitSlop={8}
-                    style={styles.markHit}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Mark ${item.title} as watched`}
-                    accessibilityState={{ disabled: busy }}
-                  >
-                    <Text style={styles.markText}>{busy ? 'Saving…' : 'Mark watched'}</Text>
-                  </Pressable>
-                </View>
-              </View>
-            );
-          }}
-        />
-      )}
-    </SafeAreaView>
+      </View>
+    );
+  }
+
+  return (
+    <FlatList
+      style={styles.flex}
+      data={items}
+      keyExtractor={(item) => item.id}
+      refreshing={loading}
+      onRefresh={reload}
+      contentContainerStyle={styles.list}
+      renderItem={({ item }) => {
+        const poster = tmdbPosterUrl(item.posterPath, 'card');
+        const busy = markingId === item.id;
+        return (
+          <View style={[styles.row, glassCard()]}>
+            {poster ? (
+              <Image source={{ uri: poster }} style={styles.poster} />
+            ) : (
+              <View style={[styles.poster, styles.posterPlaceholder]} />
+            )}
+            <View style={styles.rowBody}>
+              <Text style={styles.title} numberOfLines={2}>
+                {item.title}
+              </Text>
+              <Text style={styles.meta}>
+                {item.year ?? '—'} · {item.displayType}
+              </Text>
+              <Pressable
+                onPress={() => markWatched(item)}
+                disabled={busy}
+                hitSlop={8}
+                style={styles.markHit}
+                accessibilityRole="button"
+                accessibilityLabel={`Mark ${item.title} as watched`}
+                accessibilityState={{ disabled: busy }}
+              >
+                <Text style={styles.markText}>{busy ? 'Saving…' : 'Mark watched'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        );
+      }}
+    />
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: color.bg },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: space.lg,
-  },
-  headerTitle: { color: color.text, ...type.title, fontSize: 18 },
-  closeHit: { minHeight: 44, justifyContent: 'center' },
-  closeText: { color: color.textMuted, fontWeight: '600' },
-  list: { paddingHorizontal: space.lg, paddingBottom: space.xl },
+  list: { padding: space.lg },
   row: {
     flexDirection: 'row',
     gap: space.md,

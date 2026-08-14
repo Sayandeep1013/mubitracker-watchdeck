@@ -113,8 +113,6 @@ export default function RootLayout() {
                           options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
                         />
                         <Stack.Screen name="friends/[id]" />
-                        <Stack.Screen name="watch-later" />
-                        <Stack.Screen name="about" />
                         <Stack.Screen
                           name="filters"
                           options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
