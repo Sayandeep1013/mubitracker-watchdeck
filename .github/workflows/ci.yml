@@ -6,8 +6,11 @@ on:
   pull_request:
     branches: [main, master]
 
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+
 jobs:
-  build:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,3 +42,64 @@ jobs:
           TMDB_V3_API_KEY: placeholder
           TMDB_READ_ACCESS_TOKEN: placeholder
           NEXT_PUBLIC_APP_URL: http://localhost:3000
+
+  # Catches a class of failure `verify` is blind to: a Metro-resolvable
+  # import that breaks under `expo export` (bad @mubitracker/shared export,
+  # a native module used on web, Reanimated 4 worklet misuse). This is a
+  # bundle check only — no emulator, no APK. Device E2E is nightly (spec
+  # 50 §3/§4 — a Maestro no-op costs ~24s, too slow per-push).
+  mobile-bundle:
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mubitracker/shared build
+      - run: pnpm --filter @mubitracker/mobile exec expo export --platform android
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: placeholder
+          EXPO_PUBLIC_API_URL: http://localhost:3000
+
+  # /api/v1/* status codes, response shape, idempotency (spec 50 §4).
+  # Targets STAGING_URL, which today is the production URL — there is no
+  # staging Supabase project yet (spec 50 §1/Stage 5.5), so this is
+  # accepted debt: wqa*-prefixed accounts only, no destructive assertions.
+  contract-smoke:
+    runs-on: ubuntu-latest
+    needs: verify
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/validate-deck-loop.mjs
+        env:
+          BASE_URL: ${{ vars.STAGING_URL }}
+          QA_TEST_PASSWORD: ${{ secrets.QA_TEST_PASSWORD }}
+
+  # User journeys through the real UI (spec 50 §4). Same STAGING_URL
+  # caveat as contract-smoke above.
+  e2e-web:
+    runs-on: ubuntu-latest
+    needs: contract-smoke
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @mubitracker/web test:e2e:install
+      - run: pnpm --filter @mubitracker/web test:e2e
+        env:
+          E2E_BASE_URL: ${{ vars.STAGING_URL }}
+          E2E_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL }}
+          E2E_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY }}
+          QA_TEST_PASSWORD: ${{ secrets.QA_TEST_PASSWORD }}
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: playwright-report, path: apps/web/playwright-report/ }

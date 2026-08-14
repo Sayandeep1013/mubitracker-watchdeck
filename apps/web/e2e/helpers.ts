@@ -4,7 +4,10 @@ export const BASE_URL = process.env.E2E_BASE_URL ?? 'https://mubitracker-watchde
 const SUPABASE_URL = process.env.E2E_SUPABASE_URL ?? '';
 const SUPABASE_ANON = process.env.E2E_SUPABASE_ANON_KEY ?? '';
 
-export const TEST_PASSWORD = 'TestPass123!';
+// Spec 50 §5: fixed password from the QA_TEST_PASSWORD secret, never
+// hardcoded in a committed flow. The literal fallback only covers local
+// runs where the secret isn't set as an env var.
+export const TEST_PASSWORD = process.env.QA_TEST_PASSWORD ?? 'TestPass123!';
 
 /** Test accounts are prefixed so they are identifiable and cleanable (spec 50 §5). */
 export function testUsername(prefix = 'wqa'): string {

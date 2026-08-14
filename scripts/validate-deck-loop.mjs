@@ -23,7 +23,9 @@ const stamp = Date.now().toString().slice(-8);
 // this script's accounts too — `deck_` is kept in that allowlist only for
 // pre-existing rows created before this default changed.
 const username = process.env.TEST_USERNAME || `wqa${stamp}`;
-const password = process.env.TEST_PASSWORD || 'MubitrackerTest123!';
+// Spec 50 §5: one canonical QA_TEST_PASSWORD secret shared with the
+// Playwright suite (apps/web/e2e/helpers.ts), not a script-specific one.
+const password = process.env.QA_TEST_PASSWORD || process.env.TEST_PASSWORD || 'MubitrackerTest123!';
 const reuseExisting = Boolean(process.env.TEST_USERNAME);
 
 function usernameToAuthEmail(u) {
