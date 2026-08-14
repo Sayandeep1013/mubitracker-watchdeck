@@ -30,6 +30,17 @@ Migration order is always local → staging → production. Until staging exists
 against production with `wqa*`/`mqa*` accounts only (§6) and no destructive assertions, and this is
 recorded as accepted debt.
 
+**Dated waiver (2026-08-14, Stage 5.5).** `mubitracker-staging` does not exist yet. Creating it
+needs the account owner's Supabase dashboard access (project creation is not delegable to a
+project-scoped API token), plus replaying all 18 migrations and updating Vercel's preview
+environment variables — real footprint the user chose to defer rather than provision mid-session.
+Per-push CI (`verify`/`mobile-bundle`/`contract-smoke`/`e2e-web`, `.github/workflows/ci.yml`) and
+the nightly job (`.github/workflows/nightly.yml`) both target `vars.STAGING_URL`, which is
+currently set to the production URL — exactly the accepted-debt path this section already
+describes. Revisit when a staging project is actually provisioned: repoint `STAGING_URL` and
+`E2E_SUPABASE_URL`/`E2E_SUPABASE_ANON_KEY` (GitHub repo Variables/Secrets) at it, replay migrations
+there first, and this waiver is closed.
+
 ---
 
 ## 2. Environment variables
